@@ -16,9 +16,9 @@ https://cadwiz.app/feedback/status.
 
 ## What you need
 
-- **Claude Desktop with a Claude subscription.** CADWiz is Claude's hands and eyes
-  in FreeCAD; the design thinking happens in Claude. CADWiz itself makes no paid AI
-  calls.
+- **One assistant app, your choice:** Claude Desktop (with a Claude subscription),
+  or ChatGPT through OpenAI's Codex app (signed in with a ChatGPT account). Choose
+  at the top of the CADWiz panel. CADWiz itself makes no paid calls.
 - One package in FreeCAD's own Python: `mcp` version 1.27 (the installer adds it;
   newer 2.x versions do not work yet).
 - **Optional:** Blender and PyMeshLab, for some mesh jobs (repairing a downloaded
@@ -26,14 +26,15 @@ https://cadwiz.app/feedback/status.
 
 ## What it does not do yet
 
-- **ChatGPT** cannot connect yet: the ChatGPT app cannot reach programs on your
-  computer. (Codex, signed in with a ChatGPT account, can be set up by hand.)
+- **The ChatGPT app itself** can't connect to programs on your computer yet, so
+  ChatGPT is used through OpenAI's **Codex** app (the installer connects it if
+  Codex is set up). Claude Desktop connects directly.
 - **FEM (stress analysis), CAM (tool paths), architecture, surface modelling and
   full assembly tools** are out of scope until "CADWiz 2.0". Technical drawings
   are in (the Drawing button).
 - **Organic shapes** (figurines, sculpted bodies) are handled as meshes, with
   fewer ways to edit them than engineered parts.
-- **Pictures of designs** are real examples Claude finds on the web, or rough
+- **Pictures of designs** are real examples your assistant finds on the web, or rough
   sketches; CADWiz does not make photo-real pictures.
 - **Big models** can take a while to rebuild; FreeCAD's window stays usable and
   Cancel works, but a very large model may take minutes.

@@ -1,29 +1,31 @@
 # Changelog
 
-## v0.5.0-beta.2 (not yet released): the first open-source release
+## v0.5.0-beta.2 (not yet released): the first open-source release, an early beta
 
-CADWiz is now open source under LGPL-2.1-or-later.
+CADWiz is now open source under LGPL-2.1-or-later, and this is an **early
+release**. Please use it on real projects and tell us what happens: in CADWiz
+(Setup > Help > Report a problem / Get help) or at cadwiz.app/feedback.
 
-This release is the **Claude plug-in**: you talk to Claude in Claude Desktop, and
-CADWiz is Claude's hands and eyes in FreeCAD. The earlier closed-beta assistant,
-which had a chat and voice panel inside FreeCAD and needed your own API key, is
-not part of this release.
+CADWiz is now a panel in FreeCAD that works with the assistant app **you**
+choose: Claude Desktop, or ChatGPT through OpenAI's Codex app. Pick one at the
+top of the panel. The closed beta's built-in chat and voice panel, and the need
+for your own API key, are gone.
 
-- **Tools Claude can use:** inspect, measure, render, build, edit, versions, print
-  check, export, open and save; pictures before 3D (choose a design); guided
-  design questions; marks on the model shared between you and Claude; mesh import,
-  repair and part swap; technical drawings; problems and fixes.
 - **The CADWiz panel:** in every FreeCAD workbench, with a connection light and a
-  Connect button, the shared picture with marks, the time machine (every version
-  is a complete saved copy), and the Creating, Printing and Setup pages.
-- **Help desk:** Claude can check the project's known issues and, only with your
-  yes, send a bug, idea or question to cadwiz.app, with an error report
-  (screenshot, what happened, versions; file paths and your user name removed).
-  **Get help** on the panel opens the feedback page filled in.
+  Connect button, the picture of your model with marks, the time machine (every
+  version is a complete saved copy), and the Creating, Printing and Setup pages.
+- **What CADWiz can do in FreeCAD:** inspect, measure, render, build, edit,
+  versions, print check, export, open and save; pictures to choose from before
+  3D; guided design questions; shared marks on the model; mesh import, repair and
+  part swap; technical drawings; problems and fixes.
+- **Feedback built in:** Report a problem and Get help on the Setup page; your
+  assistant can also check the known issues and, only with your yes, send a
+  report (screenshot, what happened, versions; file paths and your user name
+  removed).
 - **Your buttons:** every main button is in one table; add your own in one line
   (docs/CUSTOMIZING.md).
-- **Installer** for Windows (asks before opening FreeCAD's download page); a
-  script for macOS and Linux.
-- **Safety:** the code Claude writes runs sandboxed in a separate FreeCAD without
-  a window; your file is backed up before the first change; nothing of yours is
-  ever deleted; every network call is listed with what it sends.
+- **Installer** for Windows that connects Claude Desktop and, if present, Codex,
+  and asks before opening FreeCAD's download page; a script for macOS and Linux.
+- **Safety:** code written by the assistant runs sandboxed in a separate FreeCAD
+  without a window; your file is backed up before the first change; nothing of
+  yours is ever deleted; every network call is listed with what it sends.

@@ -127,6 +127,12 @@ def _button(QtWidgets: Any, key: str, parent: Any) -> Any:
     return button
 
 
+def assistant_word(ai_app: str) -> str:
+    """The name on the Show button for the assistant chosen at the top of the panel
+    (ORDER-2026-10-21-01: CADWiz works with Claude or ChatGPT; neither is the default)."""
+    return {"claude": "Claude", "chatgpt": "ChatGPT"}.get(str(ai_app), "assistant")
+
+
 def run_freecad_command(command: str) -> None:
     from importlib import import_module
 
@@ -1093,6 +1099,7 @@ class _Panel:
         self.strip_light.setStyleSheet("font-size: 28px;")
         column.addWidget(self.strip_light)
         show = QtWidgets.QPushButton("Show\nClaude", strip)
+        self.strip_show = show
         show.setObjectName("CADWiz_Strip_Show_Claude")
         show.setProperty("role", "primary")
         show.clicked.connect(lambda: self.freeze_for_claude())
@@ -1510,6 +1517,10 @@ class _Panel:
         self.strip_light.setStyleSheet(f"color: {light['light']}; font-size: 28px;")
         self.strip_light.setToolTip(light["line"])
         self.ai_choice.refresh()
+        with contextlib.suppress(Exception):
+            word = assistant_word(self.prefs.ai_app)
+            self.show_claude.setText(f"Show {word}")
+            self.strip_show.setText(f"Show\n{word}")
         with contextlib.suppress(Exception):
             self.problems_card.watch()
         with contextlib.suppress(Exception):
