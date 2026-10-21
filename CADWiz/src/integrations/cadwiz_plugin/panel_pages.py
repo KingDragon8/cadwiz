@@ -32,14 +32,14 @@ from ai_freecad_core.cadwiz_screen.problems import Problem, from_print_notes, su
 from ai_freecad_core.visual_communications.anchored import inches_first
 
 CONCEPTS_MIN_HEIGHT = 160          # the design cards scroll; never sets the panel's height (ORDER-2026-10-19-01)
-ASK_CLAUDE = "Now tell Claude “fix it” in the Claude app."
+ASK_CLAUDE = "Now tell your assistant “fix it” in its app."
 PRINT_TIME_HONEST = ("Print time and filament: your slicer shows these when you open the file in it. "
                      "CADWiz can't read them from {slicer} yet.")
 
 
-CLAUDE_USAGE_LINE = ("Your talks with Claude come out of your Claude subscription -- there is no charge per question. "
-                     "Claude doesn't tell CADWiz how much of it you have used; to see that, open the Claude app: "
-                     "Settings > Usage.")
+CLAUDE_USAGE_LINE = ("Your talks with your assistant come out of your Claude or ChatGPT subscription -- there is no charge "
+                     "per question. The app doesn't tell CADWiz how much of it you have used; to see that, open the app's "
+                     "settings (Usage).")
 
 
 def usage_lines(rows: list[dict[str, Any]]) -> list[str]:
@@ -66,12 +66,13 @@ def usage_lines(rows: list[dict[str, Any]]) -> list[str]:
 
 CHATGPT_CONNECTED = "ChatGPT connected"
 CHATGPT_NOT_CONNECTED = "ChatGPT not connected"
-CHATGPT_TODO = ("The ChatGPT app can't reach programs on your PC yet. Codex, signed in with your ChatGPT account, "
-                "can -- see Setup > Connection.")
-CODEX_STEPS = ("To use ChatGPT instead: the ChatGPT app can't connect to programs on your PC yet, but "
-               "Codex (signed in with your ChatGPT account) can. Ask Claude or a helper to add CADWiz to Codex's "
-               "settings file (.codex\\config.toml) the same way it is in Claude's. The ChatGPT light turns green "
-               "only when Codex has really connected.")
+CHATGPT_TODO = ("Open the ChatGPT desktop app (for Windows and Mac, signed in with your ChatGPT "
+                "account) -- this turns green by itself within 30 seconds. If CADWiz isn't in its settings yet, run "
+                "CADWiz's installer again.")
+CODEX_STEPS = ("To use ChatGPT: install the ChatGPT desktop app (chatgpt.com/download), sign in with your ChatGPT "
+               "account, then run CADWiz's installer again -- it adds CADWiz to the app's settings (its MCP servers, "
+               "in .codex/config.toml). Choose ChatGPT under Talk to; the ChatGPT light turns green only when the "
+               "app has really connected.")
 
 
 def ai_lights(bridge: Any, choice: str) -> list[dict[str, str]]:
@@ -283,7 +284,7 @@ def problem_row(panel: Any, parent: Any, problem: Problem, *, with_show_me: bool
     from integrations.cadwiz_plugin.slim_panel import _make_flow_layout
 
     flow = _make_flow_layout(QtCore, QtWidgets)(buttons, 6)
-    ask = QtWidgets.QPushButton("Ask Claude to fix", buttons)
+    ask = QtWidgets.QPushButton("Ask to fix", buttons)
     ask.setObjectName("CADWiz_Problem_Ask_Claude")
     ask.clicked.connect(lambda: panel.ask_claude_to_fix(problem))
     explain = QtWidgets.QPushButton("Explain", buttons)
@@ -513,10 +514,11 @@ class SetupPage:
         self.tools.setObjectName("CADWiz_Setup_Tool_Count")
         steps = QtWidgets.QLabel(
             "When the light is red:\n"
-            "1. Quit the Claude app fully: right-click its icon by the clock and choose Quit, then open it again.\n"
+            "1. Press Connect at the top; it opens the app you chose under Talk to.\n"
             "2. Keep FreeCAD open: CADWiz starts with it.\n"
-            "3. In a Claude chat, check that CADWiz is switched on under the + (Search and tools) button.\n"
-            "4. The first time Claude uses CADWiz it asks; choose Allow always.", link)
+            "3. Claude Desktop: in a chat, check that CADWiz is switched on under the + (Search and tools) button.\n"
+            "4. Still red: quit the app fully (right-click its icon by the clock, Quit) and open it again. The first "
+            "time the app uses CADWiz it asks; choose Allow always.", link)
         steps.setWordWrap(True)
         codex = QtWidgets.QLabel(CODEX_STEPS, link)
         codex.setObjectName("CADWiz_Setup_ChatGPT_Steps")
@@ -569,7 +571,7 @@ class SetupPage:
         column.addWidget(shop)
 
         how, h_col = panel._section(inner, "How Claude works with you", "CADWiz_How_Claude_Works")
-        note = QtWidgets.QLabel("Claude reads these through CADWiz and follows them. For lessons, ask Claude in the Claude app "
+        note = QtWidgets.QLabel("Your assistant reads these through CADWiz and follows them. For lessons, ask it in its app "
                                 "(“teach me how fillets work”).", how)
         note.setWordWrap(True)
         h_col.addWidget(note)
@@ -595,7 +597,7 @@ class SetupPage:
             sites.addWidget(box)
             self.sites[site] = box
         sites.addStretch(1)
-        models_form.addRow("Sites Claude searches", sites)
+        models_form.addRow("Sites to search for models", sites)
         column.addWidget(models)
 
         saving, v_col = panel._section(inner, "Saving and versions")
@@ -614,7 +616,7 @@ class SetupPage:
         shown_row.addWidget(self.versions_shown)
         shown_row.addStretch(1)
         v_col.addLayout(shown_row)
-        always = QtWidgets.QLabel("Always on: a version is saved before every change Claude makes. CADWiz never deletes a version.", saving)
+        always = QtWidgets.QLabel("Always on: a version is saved before every change your assistant makes. CADWiz never deletes a version.", saving)
         always.setWordWrap(True)
         v_col.addWidget(always)
         column.addWidget(saving)
@@ -639,7 +641,7 @@ class SetupPage:
         help_box, x_col = panel._section(inner, "Help")
         from integrations.cadwiz_plugin.slim_panel import EXAMPLE_SENTENCES
 
-        x_col.addWidget(QtWidgets.QLabel("Five things to say to Claude:", help_box))
+        x_col.addWidget(QtWidgets.QLabel("Five things to say to your assistant:", help_box))
         for sentence in EXAMPLE_SENTENCES:
             row = QtWidgets.QHBoxLayout()
             words = QtWidgets.QLabel(f"“{sentence}”", help_box)
@@ -654,7 +656,7 @@ class SetupPage:
         report = QtWidgets.QPushButton("Report a problem", help_box)
         report.setObjectName("CADWiz_Report_Problem")
         report.clicked.connect(self.report)
-        self.report_result = QtWidgets.QLabel("Saves a picture of FreeCAD and your note, and copies a report to paste into the Claude chat.",
+        self.report_result = QtWidgets.QLabel("Saves a picture of FreeCAD and your note, and copies a report to paste into your assistant's chat.",
                                               help_box)
         self.report_result.setWordWrap(True)
         # ORDER-2026-10-21-01 (Addendum One B3): Get help opens cadwiz.app/feedback with the
@@ -699,7 +701,7 @@ class SetupPage:
         light = lights[0]
         self.light.setText("\n".join(f"● {each['line']}" for each in lights))
         self.light.setStyleSheet(f"color: {light['light']}; font-weight: 700;")
-        self.tools.setText(f"{len(TOOL_NAMES)} CADWiz tools are available to Claude.")
+        self.tools.setText(f"{len(TOOL_NAMES)} CADWiz tools are available to your assistant.")
         self._printers = [Printer(p.name, p.bed_x_mm, p.bed_y_mm, p.bed_z_mm, p.nozzle_mm) for p in prefs.printers]
         self._default = prefs.default_printer
         blocked = self.printer_list.blockSignals(True)
@@ -782,7 +784,7 @@ class SetupPage:
             return
         self.panel.prefs = prefs
         self.panel.save_preferences()
-        self.saved.setText("Saved. Claude follows these from its next message.")
+        self.saved.setText("Saved. Your assistant follows these from its next message.")
         self.refresh()
 
     def report(self) -> None:
@@ -829,7 +831,7 @@ class SetupPage:
         text = "\n".join(lines)
         (folder / f"report-{stamp}.txt").write_text(text, encoding="utf-8")
         panel.QtWidgets.QApplication.clipboard().setText(text)
-        self.report_result.setText("Copied. Paste it into the Claude chat" + (f" and attach the picture {picture.name} from {folder}." if picture.is_file() else ".")
+        self.report_result.setText("Copied. Paste it into your assistant's chat" + (f" and attach the picture {picture.name} from {folder}." if picture.is_file() else ".")
                                    + (f" Or press Get help to send report {self.last_report_id} on cadwiz.app." if self.last_report_id else ""))
 
     @staticmethod
@@ -905,7 +907,7 @@ class ConceptsView:
         self.make_3d = QtWidgets.QPushButton("Make it 3D", self.widget)
         self.make_3d.setObjectName("CADWiz_Make_It_3D")
         self.make_3d.setProperty("role", "primary")
-        self.make_3d.setToolTip("Tell Claude you are happy with the picked design: it builds the 3D model on your next message")
+        self.make_3d.setToolTip("Tell your assistant you are happy with the picked design: it builds the 3D model on your next message")
         self.make_3d.clicked.connect(self.request_3d)
         history.addWidget(self.make_3d)
         column.addLayout(history)
@@ -944,7 +946,7 @@ class ConceptsView:
         _clear(self.cards)
         _clear(self.rounds_holder)
         if not history.rounds:
-            self.title.setText("No designs to choose from yet. Ask Claude for ideas (“show me three concepts for a shelf bracket”).")
+            self.title.setText("No designs to choose from yet. Ask your assistant for ideas (“show me three concepts for a shelf bracket”).")
             self.make_3d.setEnabled(False)
             self.status.setText("")
             return
@@ -967,7 +969,7 @@ class ConceptsView:
             title = QtWidgets.QLabel(f"{number}. {card.title}", frame)
             title.setStyleSheet("font-weight: 700;")
             title.setWordWrap(True)
-            source = QtWidgets.QLabel("Claude's sketch" if card.kind == "sketch" else f"Found: {card.source}", frame)
+            source = QtWidgets.QLabel("A sketch" if card.kind == "sketch" else f"Found: {card.source}", frame)
             source.setWordWrap(True)
             licence = QtWidgets.QLabel(card.licence_line(), frame)
             licence.setWordWrap(True)
@@ -993,11 +995,11 @@ class ConceptsView:
         chosen = history.chosen()
         self.make_3d.setEnabled(chosen is not None)
         if history.make_3d:
-            self.status.setText(f"You asked for “{history.make_3d['title']}” in 3D. Tell Claude “make it 3D” if you have not yet.")
+            self.status.setText(f"You asked for “{history.make_3d['title']}” in 3D. Tell your assistant “make it 3D” if you have not yet.")
         elif chosen is not None:
-            self.status.setText(f"Picked: “{chosen[1].title}” (round {chosen[0].number}). Ask Claude for changes, or press Make it 3D.")
+            self.status.setText(f"Picked: “{chosen[1].title}” (round {chosen[0].number}). Ask your assistant for changes, or press Make it 3D.")
         else:
-            self.status.setText("Pick the design you like, or tell Claude what to change.")
+            self.status.setText("Pick the design you like, or tell your assistant what to change.")
 
     def show_round(self, number: int) -> None:
         self.showing = number
@@ -1017,7 +1019,7 @@ class ConceptsView:
             return
         self.panel.screen().save_concepts()
         self.render()
-        self.panel.flash(f"Now tell Claude “make it 3D” in the Claude app ({asked['title']}).", self.panel.FOUNDER_BLUE, seconds=5.0)
+        self.panel.flash(f"Now tell your assistant “make it 3D” in its app ({asked['title']}).", self.panel.FOUNDER_BLUE, seconds=5.0)
 
 
 def _picture(QtCore: Any, QtGui: Any, path: str, width: int) -> Any:

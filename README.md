@@ -60,9 +60,8 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
 - **FreeCAD 1.1.3** (1.1 or newer): [freecad.org/downloads](https://www.freecad.org/downloads.php)
 - **One assistant app, your choice:**
   - **Claude Desktop** ([claude.ai/download](https://claude.ai/download)), with a Claude subscription, **or**
-  - **ChatGPT through OpenAI's Codex app**, signed in with your ChatGPT account.
-    (The ChatGPT app itself can't connect to programs on your computer yet; Codex
-    can.)
+  - **the ChatGPT desktop app** ([chatgpt.com/download](https://chatgpt.com/download)),
+    signed in with your ChatGPT account.
 - **Windows 10 or 11** is the most tested. **macOS and Linux:** help wanted.
 
 ## Install
@@ -74,7 +73,7 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
 3. Double-click **`install_windows.bat`**. If FreeCAD 1.1 isn't installed, it asks
    whether to open FreeCAD's download page. It never downloads anything by itself.
    It then copies CADWiz into FreeCAD and connects CADWiz to Claude Desktop and,
-   if you have it, Codex (ChatGPT), saving a copy of each app's settings first.
+   if you have it, the ChatGPT desktop app, saving a copy of each app's settings first.
    It lists everything it changed.
 
 **macOS / Linux (less tested):** unzip, then run `bash scripts/install.sh`.
@@ -95,7 +94,7 @@ and add CADWiz to your assistant app's settings. For Claude Desktop, that's
 }
 ```
 
-For Codex, it's `%USERPROFILE%\.codex\config.toml`:
+For the ChatGPT desktop app, it's `%USERPROFILE%\.codex\config.toml`:
 
 ```toml
 [mcp_servers.cadwiz]

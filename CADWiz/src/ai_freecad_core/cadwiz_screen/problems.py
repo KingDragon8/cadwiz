@@ -16,13 +16,13 @@ from ai_freecad_core.visual_communications.anchored import inches_first
 
 #: kind -> (plain heading, how to resolve it)
 KINDS: dict[str, tuple[str, str]] = {
-    "connection": ("Your assistant can't reach CADWiz", "Open your assistant app (Claude Desktop, or Codex for ChatGPT), or quit it fully and open it again; the light turns green within a minute."),
+    "connection": ("Your assistant can't reach CADWiz", "Open your assistant app (Claude Desktop, or the ChatGPT app), or quit it fully and open it again; the light turns green within a minute."),
     "rebuild": ("A step of the model failed to rebuild", "Ask Claude to fix it, or go back to the last version that rebuilt."),
-    "sketch_open": ("A sketch has a gap in its outline", "Close the gap so the outline is one closed loop; Claude can find and join the ends."),
-    "sketch_broken": ("A sketch's rules contradict each other", "Remove the clashing rule (constraint); Claude can find which one."),
+    "sketch_open": ("A sketch has a gap in its outline", "Close the gap so the outline is one closed loop; your assistant can find and join the ends."),
+    "sketch_broken": ("A sketch's rules contradict each other", "Remove the clashing rule (constraint); your assistant can find which one."),
     "loose": ("A loose piece", "Move it until it touches, or join it; on its own it prints as a separate piece or falls over."),
     "overlap": ("Two parts overlap", "Fine if they are meant to print as one; otherwise move one so they only touch."),
-    "mesh_holes": ("The mesh has holes", "Repair it before printing (Claude can run the mesh repair); a slicer may print it wrong."),
+    "mesh_holes": ("The mesh has holes", "Repair it before printing (your assistant can run the mesh repair); a slicer may print it wrong."),
     "overhang": ("Steep overhangs", "Add supports in the slicer, turn the model, or add a chamfer under the overhang."),
     "thin": ("Thin walls", "Make the walls thicker than your nozzle can print, or the printer will skip them."),
     "bed": ("Too big for the bed", "Scale it down, turn it, or split it into parts."),

@@ -73,7 +73,7 @@ def _shape_fingerprint(objects: list[Any]) -> tuple:
 def find_problems(document: Any, connected: bool = True) -> list[Problem]:
     problems: list[Problem] = []
     if not connected:
-        problems.append(Problem("connection", "The connection light is red: Claude cannot see or change the model right now."))
+        problems.append(Problem("connection", "The connection light is red: your assistant cannot see or change the model right now."))
     if document is None:
         return problems
     objects = list(getattr(document, "Objects", []) or [])

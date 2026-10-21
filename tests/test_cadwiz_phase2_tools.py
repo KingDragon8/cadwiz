@@ -296,7 +296,7 @@ def test_setup_usage_says_only_what_the_call_log_holds() -> None:
     lines = panel_pages.usage_lines(rows)
     assert "2 answers on 2026-10-12, 1,200 tokens sent and 35 received" in lines[1]
     assert "never recorded what those cost" in lines[2]
-    assert "Settings > Usage" in lines[0]
+    assert "settings (Usage)" in lines[0]
 
 
 def test_chatgpt_turns_green_only_on_a_real_chatgpt_hello() -> None:

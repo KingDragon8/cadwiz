@@ -17,7 +17,7 @@ https://cadwiz.app/feedback/status.
 ## What you need
 
 - **One assistant app, your choice:** Claude Desktop (with a Claude subscription),
-  or ChatGPT through OpenAI's Codex app (signed in with a ChatGPT account). Choose
+  or the ChatGPT desktop app (signed in with a ChatGPT account). Choose
   at the top of the CADWiz panel. CADWiz itself makes no paid calls.
 - One package in FreeCAD's own Python: `mcp` version 1.27 (the installer adds it;
   newer 2.x versions do not work yet).
@@ -26,9 +26,10 @@ https://cadwiz.app/feedback/status.
 
 ## What it does not do yet
 
-- **The ChatGPT app itself** can't connect to programs on your computer yet, so
-  ChatGPT is used through OpenAI's **Codex** app (the installer connects it if
-  Codex is set up). Claude Desktop connects directly.
+- **In the ChatGPT desktop app**, CADWiz's tools are proven in its Codex (agent)
+  conversations. Whether its plain chats can use local tools like CADWiz depends
+  on the app's version; if a chat says it can't see CADWiz, start a Codex
+  conversation in the same app.
 - **FEM (stress analysis), CAM (tool paths), architecture, surface modelling and
   full assembly tools** are out of scope until "CADWiz 2.0". Technical drawings
   are in (the Drawing button).

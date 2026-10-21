@@ -7,7 +7,7 @@ release**. Please use it on real projects and tell us what happens: in CADWiz
 (Setup > Help > Report a problem / Get help) or at cadwiz.app/feedback.
 
 CADWiz is now a panel in FreeCAD that works with the assistant app **you**
-choose: Claude Desktop, or ChatGPT through OpenAI's Codex app. Pick one at the
+choose: Claude Desktop, or the ChatGPT desktop app. Pick one at the
 top of the panel. The closed beta's built-in chat and voice panel, and the need
 for your own API key, are gone.
 
@@ -24,7 +24,7 @@ for your own API key, are gone.
   removed).
 - **Your buttons:** every main button is in one table; add your own in one line
   (docs/CUSTOMIZING.md).
-- **Installer** for Windows that connects Claude Desktop and, if present, Codex,
+- **Installer** for Windows that connects Claude Desktop and, if present, the ChatGPT app,
   and asks before opening FreeCAD's download page; a script for macOS and Linux.
 - **Safety:** code written by the assistant runs sandboxed in a separate FreeCAD
   without a window; your file is backed up before the first change; nothing of

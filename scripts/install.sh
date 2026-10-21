@@ -70,19 +70,19 @@ p.write_text(json.dumps(config, indent=2), encoding="utf-8")
 PY
 CHANGED+=("Added CADWiz to Claude Desktop's settings ($CLAUDE_CONFIG)")
 
-# ChatGPT, through OpenAI's Codex app (signed in with a ChatGPT account)
+# The ChatGPT desktop app (it keeps its tool settings in ~/.codex/config.toml)
 CODEX_CONFIG="${CODEX_CONFIG:-$HOME/.codex/config.toml}"
 if [ -f "$CODEX_CONFIG" ]; then
   if grep -q '^\[mcp_servers\.cadwiz\]' "$CODEX_CONFIG"; then
-    CHANGED+=("ChatGPT (Codex) already had CADWiz in its settings; left as it was")
+    CHANGED+=("The ChatGPT app already had CADWiz in its settings; left as it was")
   else
     cp "$CODEX_CONFIG" "$CODEX_CONFIG.before-cadwiz-$STAMP"
     printf "\n[mcp_servers.cadwiz]\ncommand = '%s'\nargs = ['%s']\nstartup_timeout_sec = 60\n" \
       "$FREECAD_PY" "$ADDON/src/integrations/cadwiz_plugin/server.py" >> "$CODEX_CONFIG"
-    CHANGED+=("Added CADWiz to ChatGPT/Codex's settings ($CODEX_CONFIG), after saving a copy")
+    CHANGED+=("Added CADWiz to the ChatGPT app's settings ($CODEX_CONFIG), after saving a copy")
   fi
 else
-  CHANGED+=("ChatGPT/Codex is not set up here, so only Claude was connected. Install Codex and run this again to use ChatGPT.")
+  CHANGED+=("The ChatGPT desktop app is not set up here, so only Claude was connected. Install it and run this again to use ChatGPT.")
 fi
 
 echo; echo "Done. What this script changed:"

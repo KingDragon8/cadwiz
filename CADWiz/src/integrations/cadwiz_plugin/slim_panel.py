@@ -71,16 +71,16 @@ CONNECTED = "Connected to Claude"
 CONNECTING = "Connecting…"
 CONNECTING_TODO = "Nothing to do: your assistant app checks in within 30 seconds."
 NOT_CONNECTED = "Not connected"
-NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or Codex for ChatGPT) -- that is all; this turns "
+NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or the ChatGPT app) -- that is all; this turns "
                       "green by itself within 30 seconds. If it stays red, press Connect.")
 #: How long after FreeCAD opens the light waits (amber) for the first check-in.
 CONNECTING_GRACE_S = 45.0
 NO_BRIDGE = "Not connected — CADWiz's plug-in did not start; close and reopen FreeCAD"
 NO_BRIDGE_TODO = "Close FreeCAD and open it again. If the light stays red, open Setup below."
-NO_PICTURE = "A picture of the model appears here after Claude builds or changes it."
+NO_PICTURE = "A picture of the model appears here after your assistant builds or changes it."
 NO_MODEL = "Open or create a model in FreeCAD and it appears here, in any workbench."
-FROZEN = "Frozen. Now tell Claude what you mean in the Claude app."
-CLAUDE_HAS_IT = "Claude has it"
+FROZEN = "Frozen. Now tell your assistant what you mean, in its app."
+CLAUDE_HAS_IT = "Your assistant has it"
 
 TOOLS = (("point", "Point", "Pin a spot"), ("circle", "Circle", "Circle a region: drag from the middle out"),
          ("box", "Box", "Draw a rectangle around a region"),
@@ -95,22 +95,22 @@ VIEWS = (("front", "Front"), ("top", "Top"), ("side", "Side"), ("iso", "Iso"))
 #: the tooltip). Change the words or the tooltip here and nothing else needs to change.
 BUTTONS: dict[str, tuple[str, str, str]] = {
     "pop_out": ("Pop out", "CADWiz_Pop_Out", "Open CADWiz in its own window, for a second screen. Dock back returns it here."),
-    "collapse": ("Collapse", "CADWiz_Collapse", "Shrink CADWiz to a thin strip (the Wiz, the light and Show Claude)"),
+    "collapse": ("Collapse", "CADWiz_Collapse", "Shrink CADWiz to a thin strip (the Wiz, the light and Show)"),
     "cut_away": ("Cut-away", "CADWiz_View_Cut_Away",
                  "See inside: the half nearest you is cut away in the picture (the model is not changed)"),
     "assembly": ("Assembly", "CADWiz_View_Assembly",
                  "Pull the parts apart in the picture -- a lid lifts off its can (the model is not changed)"),
-    "model": ("Model", "CADWiz_Show_Model", "The live picture of the model open in FreeCAD: mark on it and press Show Claude"),
+    "model": ("Model", "CADWiz_Show_Model", "The live picture of the model open in FreeCAD: mark on it and press Show"),
     "designs": ("Designs", "CADWiz_Show_Concepts", "The pictures Claude posts before anything is 3D: pick one, then Make it 3D. "
                                                    "The number is how many rounds of pictures this design has had"),
     "drawing": ("Drawing", "CADWiz_Show_Drawing", "The technical drawing of the model: front, top and side views, a 3D view, "
                                                   "sizes in inches and mm, and a title block. Save it as a PDF to print"),
     "show_claude": ("Show Claude", "CADWiz_Show_Claude",
-                    "Freeze this picture, your marks, your selection, the view and the version for Claude to read on your next message"),
+                    "Freeze this picture, your marks, your selection, the view and the version for your assistant to read on your next message"),
     "restore": ("Restore this version", "CADWiz_Restore_Version", ""),
     "compare": ("Compare with now", "CADWiz_Compare_Version", ""),
     "checkpoint": ("Save a checkpoint", "CADWiz_Save_Checkpoint",
-                   "Keep a full copy of the model as it is now -- before you let Claude try something risky"),
+                   "Keep a full copy of the model as it is now -- before you let your assistant try something risky"),
 }
 
 #: Your own buttons, added at the end of the view row on the Creating page. Each is
@@ -208,7 +208,7 @@ def panel_lines(bridge: Any) -> dict[str, Any]:
         if executor is not None:
             versions = [{"version": v.version, "kind": v.kind, "diff": v.diff} for v in executor.store.list_recent(8)]
     return {"light": light["light"], "connection": light["line"], "todo": light["todo"],
-            "working_on": f"Working on: {working}" if working else "Working on: nothing yet -- ask Claude to open or build something",
+            "working_on": f"Working on: {working}" if working else "Working on: nothing yet -- ask your assistant to open or build something",
             "measurements": state.get("measurements") or "", "last_change": f"Last change: {state['last_change']}" if state.get("last_change") else "",
             "versions": versions, "picture": state.get("picture") or ""}
 
@@ -232,11 +232,11 @@ def timeline_stops(records: list[Any]) -> list[dict[str, Any]]:
         if kind == "restore":
             what, who = f"brought back version {getattr(record, 'restored_from', '?')}", ""
         elif kind == "backup":
-            what = "your checkpoint" if "checkpoint" in note else ("before Claude's first change" if "before any change" in diff else
+            what = "your checkpoint" if "checkpoint" in note else ("before the assistant's first change" if "before any change" in diff else
                                                                    (note if note and note not in ("backup", "saved on request") else "saved copy"))
             who = ""
         else:
-            what, who = (diff or note or "a change"), "by Claude"
+            what, who = (diff or note or "a change"), "by your assistant"
         broken = [str(b) for b in (getattr(record, "broken", None) or [])]
         stops.append({"version": int(record.version), "what": what, "who": who, "when": _local_time(str(getattr(record, "utc", "") or "")),
                       "broken": broken, "render": str(getattr(record, "render", "") or ""), "kind": kind,
@@ -680,7 +680,7 @@ class _Panel:
         self.connect_button = QtWidgets.QPushButton("Connect", header)
         self.connect_button.setObjectName("CADWiz_Connect")
         self.connect_button.setProperty("role", "primary")
-        self.connect_button.setToolTip("Get Claude connected: opens the Claude app if it is closed, then waits for it to check in")
+        self.connect_button.setToolTip("Connect your assistant: opens the app chosen under Talk to (Claude or ChatGPT) if it is closed, then waits for it to check in")
         self.connect_button.clicked.connect(self.connect_claude)
         self.connect_button.hide()
         self.connector = None
@@ -1041,7 +1041,7 @@ class _Panel:
     def connect_claude(self) -> None:
         from integrations.cadwiz_plugin.connect_claude import Connector
 
-        self.connector = Connector()
+        self.connector = Connector(app=str(getattr(self.prefs, "ai_app", "claude")))
         self.refresh()
 
     def save_preferences(self) -> None:
@@ -1063,7 +1063,7 @@ class _Panel:
         """Freeze the screen for Claude with this problem as his request: Claude
         reads it on his next message ("fix it")."""
         self.freeze_for_claude(request={"ask": "fix this problem", "problem": problem.to_dict()})
-        self.flash("Now tell Claude \u201cfix it\u201d in the Claude app.", FOUNDER_BLUE, seconds=5.0)
+        self.flash("Now tell your assistant \u201cfix it\u201d in its app.", FOUNDER_BLUE, seconds=5.0)
 
     def show_problem(self, problem: Any) -> None:
         from integrations.cadwiz_plugin.problems_watch import show_me
@@ -1394,8 +1394,8 @@ class _Panel:
             return ""
         frozen = _local_time(shown["frozen_at_utc"])
         if shown.get("read_by_claude_utc"):
-            return f"Showing Claude frame {shown['frame']} ({frozen}) — Claude has it"
-        return f"Showing Claude frame {shown['frame']} ({frozen}) — waiting for your next message to Claude"
+            return f"Showing the frame {shown['frame']} ({frozen}) — your assistant has it"
+        return f"Showing the frame {shown['frame']} ({frozen}) — waiting for your next message to your assistant"
 
     # ---- versions ---------------------------------------------------------------------------------
     def _store(self) -> Any:
@@ -1433,7 +1433,7 @@ class _Panel:
         self.compare_button.setEnabled(has)
         self.checkpoint_button.setEnabled(self.document() is not None)
         if not has:
-            self.stop_text.setText("No saved versions of this model yet. Save a checkpoint to start, or ask Claude to change it." if self.document()
+            self.stop_text.setText("No saved versions of this model yet. Save a checkpoint to start, or ask your assistant to change it." if self.document()
                                    else NO_MODEL)
             self.stop_broken.setText("")
             self.stop_thumb.clear()
@@ -1535,13 +1535,13 @@ class _Panel:
             if self.concepts_view.watch():           # Claude just posted new designs: show them
                 self.open_page(0)
                 self.show_screen(1)
-                self.flash("Claude posted designs to choose from.", FOUNDER_BLUE, seconds=3.0)
+                self.flash("Your assistant posted designs to choose from.", FOUNDER_BLUE, seconds=3.0)
         with contextlib.suppress(Exception):
             showing = self.pages.currentIndex() == 0 and self.screen_stack.currentIndex() == 2 and self.full.isVisible()
             if self.drawing_screen.watch(showing):       # Claude just made a drawing: show it
                 self.open_page(0)
                 self.show_screen(2)
-                self.flash("Claude made a drawing.", FOUNDER_BLUE, seconds=3.0)
+                self.flash("Your assistant made a drawing.", FOUNDER_BLUE, seconds=3.0)
         document = self.document()
         self.screen().active_document = document.Name if document is not None else ""
         self.refresh_versions()

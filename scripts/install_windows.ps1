@@ -12,7 +12,7 @@
   3. Installs the one package the Claude connection needs (mcp 1.27) into
      FreeCAD's own Python.
   4. Connects the AI app you use: adds CADWiz to Claude Desktop's settings and, if
-     OpenAI's Codex app is set up (ChatGPT), to its settings too -- after saving a
+     the ChatGPT desktop app is set up, to its settings too -- after saving a
      copy of each.
   5. Says exactly what it changed.
 
@@ -121,21 +121,21 @@ $json = $config | ConvertTo-Json -Depth 32
 [IO.File]::WriteAllText($ClaudeConfig, $json, (New-Object Text.UTF8Encoding $false))
 $Changed.Add("Added CADWiz to Claude Desktop's settings ($ClaudeConfig)")
 
-# ---- 4b. ChatGPT, through OpenAI's Codex app (signed in with a ChatGPT account) -------------
+# ---- 4b. The ChatGPT desktop app (it keeps its tool settings in .codex\config.toml) ---------
 if (Test-Path -LiteralPath $CodexConfig) {
     $codexText = Get-Content -Raw -LiteralPath $CodexConfig
     if ($codexText -match '(?m)^\[mcp_servers\.cadwiz\]') {
-        $Changed.Add("ChatGPT (Codex) already had CADWiz in its settings ($CodexConfig); left as it was")
+        $Changed.Add("The ChatGPT app already had CADWiz in its settings ($CodexConfig); left as it was")
     } else {
         $savedCodex = "$CodexConfig.before-cadwiz-$Stamp"
         Copy-Item -LiteralPath $CodexConfig -Destination $savedCodex
         $block = "`n[mcp_servers.cadwiz]`ncommand = '$FreeCADPython'`nargs = ['$server']`nstartup_timeout_sec = 60`n"
         [IO.File]::AppendAllText($CodexConfig, $block, (New-Object Text.UTF8Encoding $false))
-        $Changed.Add("Saved a copy of ChatGPT/Codex's settings as $savedCodex")
-        $Changed.Add("Added CADWiz to ChatGPT/Codex's settings ($CodexConfig)")
+        $Changed.Add("Saved a copy of the ChatGPT app's settings as $savedCodex")
+        $Changed.Add("Added CADWiz to the ChatGPT app's settings ($CodexConfig)")
     }
 } else {
-    $Changed.Add("ChatGPT/Codex is not set up on this computer, so only Claude was connected. Install Codex and run this again to use ChatGPT.")
+    $Changed.Add("The ChatGPT desktop app is not set up on this computer, so only Claude was connected. Install it and run this again to use ChatGPT.")
 }
 
 # ---- 5. what changed ----------------------------------------------------------------------
@@ -143,6 +143,6 @@ Write-Host ""
 Write-Host "Done. What this installer changed:" -ForegroundColor Green
 $Changed | ForEach-Object { Write-Host "  - $_" }
 Write-Host ""
-Write-Host "Next: open FreeCAD (the CADWiz panel appears on the right), then open Claude Desktop or Codex."
+Write-Host "Next: open FreeCAD (the CADWiz panel appears on the right), then open Claude Desktop or the ChatGPT app."
 Write-Host "The light at the top of the panel turns green within a minute. Choose Claude or ChatGPT at the top of the panel."
 exit 0

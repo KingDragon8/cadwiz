@@ -47,10 +47,10 @@ def test_the_time_slider_names_each_stop_and_flags_broken_ones() -> None:
         _record(3, "backup", note="checkpoint you saved", broken=["Pocket"]),
         _record(4, "restore", diff="restored version 2 exactly", restored_from=2),
     ])
-    assert [s["what"] for s in stops] == ["before Claude's first change", "wall 1.6 -> 2 mm", "your checkpoint", "brought back version 2"]
-    assert [s["who"] for s in stops] == ["", "by Claude", "", ""]
+    assert [s["what"] for s in stops] == ["before the assistant's first change", "wall 1.6 -> 2 mm", "your checkpoint", "brought back version 2"]
+    assert [s["who"] for s in stops] == ["", "by your assistant", "", ""]
     assert stops[2]["broken"] == ["Pocket"]
-    assert slim_panel.stop_caption(stops[1], 4).startswith("Version 2 of 4 — wall 1.6 -> 2 mm, by Claude — ")
+    assert slim_panel.stop_caption(stops[1], 4).startswith("Version 2 of 4 — wall 1.6 -> 2 mm, by your assistant — ")
     assert slim_panel.broken_caption(stops[2]) == ("v3 broke (Pocket in error). You can still restore it, or slide past it to a good one.")
     assert slim_panel.broken_caption(stops[1]) == ""
 
@@ -60,7 +60,7 @@ def test_the_header_and_last_change_lines() -> None:
     assert slim_panel.version_line("CoolOff_AI1", 0) == "CoolOff_AI1 — no saved versions yet"
     assert slim_panel.version_line("", 0) == "No model open"
     stop = slim_panel.timeline_stops([_record(2, diff="walls 1.6 -> 2.0 mm")])[0]
-    assert slim_panel.last_change_line(stop) == "Last change: walls 1.6 -> 2.0 mm, by Claude"
+    assert slim_panel.last_change_line(stop) == "Last change: walls 1.6 -> 2.0 mm, by your assistant"
     assert slim_panel.last_change_line(slim_panel.timeline_stops([_record(1, "backup")])[0]) == ""
 
 
