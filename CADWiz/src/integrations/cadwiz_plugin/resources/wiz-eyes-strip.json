@@ -1,0 +1,84 @@
+{
+ "source": "docs/characters/wiz-logo/approved-originals/cadwiz-eye-wake-blink-sleep-original.gif",
+ "source_sha256": "127688CF208264B7C59A235BAA01C17F7F9B9BD1B4A598D15B690788128EC990",
+ "how_made": "every frame of the approved GIF, unchanged except cropped to its card (60,58)-(456,454) and scaled to 128 x 128 with Lanczos; nothing redrawn",
+ "frame_size": 128,
+ "frames": 45,
+ "durations_ms": [
+  750,
+  50,
+  50,
+  100,
+  50,
+  50,
+  100,
+  50,
+  50,
+  750,
+  200,
+  550,
+  150,
+  750,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  100,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  50,
+  1050,
+  50,
+  50,
+  50,
+  50,
+  500
+ ],
+ "segments": {
+  "blank": [
+   0,
+   0
+  ],
+  "wake": [
+   1,
+   9
+  ],
+  "open": [
+   9,
+   9
+  ],
+  "blink": [
+   10,
+   11
+  ],
+  "blink_twice": [
+   10,
+   13
+  ],
+  "drowsy_to_sleep": [
+   14,
+   39
+  ],
+  "asleep": [
+   39,
+   39
+  ]
+ }
+}

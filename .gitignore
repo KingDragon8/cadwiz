@@ -1,0 +1,39 @@
+# Secrets: never commit keys, tokens or settings files that may hold them.
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+secrets.*
+*credentials*
+*token*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Build and check output
+dist/
+build/
+freecad-load-check.txt
+artifacts/
+
+# FreeCAD files and test models (keep the repo small; use tests that build their own)
+*.FCStd
+*.FCBak
+*.FCStd1
+*.stl
+*.3mf
+*.step
+*.stp
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

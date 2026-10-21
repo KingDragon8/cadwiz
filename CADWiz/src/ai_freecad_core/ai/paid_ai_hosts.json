@@ -1,0 +1,37 @@
+{
+ "_note": "Hosts whose requests cost money. Data, not code: the model seam keeps provider names out of core .py files (tests/contract/test_model_seam.py).",
+ "hosts": [
+  "aiplatform.googleapis.com",
+  "api.anthropic.com",
+  "api.assemblyai.com",
+  "api.cerebras.ai",
+  "api.cohere.ai",
+  "api.cohere.com",
+  "api.deepgram.com",
+  "api.deepseek.com",
+  "api.elevenlabs.io",
+  "api.fireworks.ai",
+  "api.groq.com",
+  "api.mistral.ai",
+  "api.moonshot.ai",
+  "api.openai.com",
+  "api.perplexity.ai",
+  "api.sambanova.ai",
+  "api.siliconflow.cn",
+  "api.together.xyz",
+  "api.x.ai",
+  "api.z.ai",
+  "dashscope.aliyuncs.com",
+  "generativelanguage.googleapis.com",
+  "open.bigmodel.cn",
+  "openrouter.ai"
+ ],
+ "provider_by_host_fragment": {
+  "openai": "openai",
+  "anthropic": "anthropic",
+  "googleapis": "gemini",
+  "openrouter": "openrouter",
+  "deepseek": "deepseek",
+  "elevenlabs": "elevenlabs"
+ }
+}

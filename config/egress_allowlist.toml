@@ -1,0 +1,70 @@
+# Approved network calls in CADWiz's code. Every outbound call under CADWiz/src must
+# be listed here with what it sends; scripts/ci/check_egress_allowlist.py fails the
+# build on anything not listed. Adding an entry is a deliberate act.
+
+[[allowed]]
+path = "CADWiz/src/ai_freecad_core/ai/spend_guard.py"
+purpose = "The automated-spend guard: wraps urllib's urlopen so an automated run cannot reach a paid AI service (founder ruling 2026-10-06, ORDER-2026-10-06-02)"
+sends = "Nothing of its own. It forwards a request to the ORIGINAL urlopen only after deciding the caller may make it; for an automated run asking for a paid AI host it refuses before anything is sent"
+receives = "Whatever the forwarded request returns, unchanged"
+hosts = ["(forwards to whatever host the caller named; paid AI hosts are refused for automated runs)"]
+user_initiated = true
+justification = """
+This is the opposite of new egress: it is the single choke point that REFUSES paid
+AI requests from tests, scripts, scheduled tasks and terminal-started runs. The
+only network-capable reference in it is the saved original `urllib.request.urlopen`
+it forwards allowed requests to (the founder's own use, and non-AI hosts). It makes
+no request itself.
+"""
+
+[[allowed]]
+path = "CADWiz/src/integrations/cadwiz_plugin/server.py"
+purpose = "Forward Claude Desktop's CADWiz tool calls to the CADWiz bridge inside the founder's own running FreeCAD"
+sends = "The tool name and its arguments (e.g. a measurement question, FreeCAD code Claude wrote, a version number), and the bridge's secret token -- to 127.0.0.1 only"
+receives = "The tool's plain result (measurements, version records, render file paths) from the founder's own FreeCAD"
+hosts = ["127.0.0.1"]
+user_initiated = true
+justification = """
+ORDER-2026-10-12-05 (founder ruling: CADWiz becomes a plug-in for Claude
+Desktop). The MCP server Claude Desktop starts is a separate process from
+FreeCAD; the only way it can reach the founder's open documents is the local
+bridge. The address is hard-wired to 127.0.0.1 (the bridge binds only there
+and refuses any request without the token from the founder's own
+%LOCALAPPDATA%), so nothing leaves the machine through this call. What Claude
+Desktop itself sends to Anthropic is the founder's own conversation in his
+own Claude app, outside CADWiz.
+"""
+
+[[allowed]]
+path = "CADWiz/src/integrations/cadwiz_plugin/fetch.py"
+purpose = "ORDER-2026-10-18-02: fetch the one picture (a concept card) or model file (STL/3MF/OBJ/STEP) the founder asked for in his Claude conversation"
+sends = "A plain HTTPS GET for that one address, with a fixed CADWiz user-agent; no cookies, tokens, model, geometry or anything of his"
+receives = "One picture (up to 15 MB) or one model file (up to 250 MB), saved in the plug-in's project folder under a new name"
+hosts = ["printables.com", "thingiverse.com", "makerworld.com", "the host of a picture or file Claude names for his request (https only, never this computer or its network)"]
+user_initiated = true
+justification = """
+The concept stage shows real designs Claude found for the founder (picture,
+source, licence), and he asked for models he links to be brought in. Claude's
+own web search finds the address; this fetches only that file. https only, no
+local or private addresses, a size cap and a time limit, a picture must be a
+picture and a model must be a model, and nothing is overwritten. The download
+runs on a background thread so FreeCAD's window keeps answering.
+"""
+
+[[allowed]]
+path = "CADWiz/src/integrations/cadwiz_plugin/feedback.py"
+purpose = "ORDER-2026-10-21-01 (open-source release, Addendum One Part B): Claude as CADWiz's help desk -- read the project's known-issues list, and file a bug, idea or question the user asked Claude to send"
+sends = "Known issues: a plain GET, nothing of the user's. Feedback: ONLY after the user has seen a preview and said yes -- the title and text, public or private, and the error report items they kept ticked (error code and message, last 10 steps, versions, a screenshot of FreeCAD; the model file only if ticked), scrubbed of file paths, the user name and key-like strings; plus the cadwiz.app session token from the user's own sign-in"
+receives = "The known-issues list (status.json); the new thread's id, status and link; a sign-in link and session token"
+hosts = ["cadwiz.app"]
+user_initiated = true
+justification = """
+The open-source release's first users mostly have no GitHub account; the
+founder's ruling (Addendum One, 2026-10-20) makes cadwiz.app the front door for
+feedback and Claude the help desk. The consent rule is enforced in the code: a
+call without confirm=true builds the preview from local files and makes no
+network request (tests/unit/test_cadwiz_help_desk.py proves it with a network
+stand-in that fails if touched). The module refuses any host but
+https://cadwiz.app. It runs in the plug-in's server process, never on FreeCAD's
+window thread, and nothing is ever reported in the background.
+"""

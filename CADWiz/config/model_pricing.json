@@ -1,0 +1,24 @@
+{
+  "_schema": "ORDER-2026-09-27-06 founder ruling 1 (cost ledger fix) + founder ruling 1 of the CADWIZ STATUS follow-up (2026-09-29): real, published $/1,000,000-token rates, sourced from each provider's own official pricing page -- never guessed or estimated. Until a model has a real entry, its cost is recorded as UNKNOWN in the ledger (real token counts are recorded regardless, captured straight from the provider's own response). Keys are \"provider/model\" exactly matching what CADWiz records. Values: {\"input_per_million_usd\": <float>, \"output_per_million_usd\": <float>, \"source_url\": <official page>, \"retrieved_date\": <YYYY-MM-DD>}. `_compute_charge` (vendored_client.py) only reads the two numeric fields; source_url/retrieved_date are kept here for audit only. This file is not a secret and is safe to commit. A model absent from _entries (or found only on a third-party aggregator, never an official first-party page) is not run under any spend-capped order -- see the founder's own 2026-09-29 ruling.",
+  "_entries": {
+    "openai/gpt-5.5": {
+      "input_per_million_usd": 5.00,
+      "output_per_million_usd": 30.00,
+      "source_url": "https://developers.openai.com/api/docs/pricing",
+      "retrieved_date": "2026-09-29"
+    },
+    "anthropic/claude-opus-5-5": {
+      "input_per_million_usd": 4.00,
+      "output_per_million_usd": 20.00,
+      "source_url": "https://claude.com/pricing",
+      "retrieved_date": "2026-09-29"
+    },
+    "gemini/gemini-3.8-flash": {
+      "input_per_million_usd": 0.75,
+      "output_per_million_usd": 3.75,
+      "source_url": "https://ai.google.dev/gemini-api/docs/pricing",
+      "retrieved_date": "2026-09-29",
+      "note": "introductory rate through 2026-12-31 per the official page; doubles to $1.50/$7.50 on 2027-01-01"
+    }
+  }
+}

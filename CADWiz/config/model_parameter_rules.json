@@ -1,0 +1,11 @@
+{
+  "_schema": "ORDER-2026-09-27-06 founder ruling 2, extended by the CADWIZ STATUS follow-up ruling 2 (2026-09-29). Some models reject a request parameter or value the vendored client (vendor/freecad-ai, pinned, never edited in place) always sends. Keys are \"provider/model\" exactly matching what CADWiz records. Values: {\"omit_params\": [<param names to strip from the request body for this model>], \"tool_choice_override\": <value to force tool_choice to instead of the vendored client's own forced \"any\"/\"tool\"/\"required\", e.g. \"auto\">}. omit_params: confirmed live 2026-09-28, these Anthropic models return HTTP 400 'temperature is deprecated for this model' the moment `temperature` appears in the request body at all. tool_choice_override: confirmed live 2026-09-29, claude-opus-5-5 returns HTTP 400 'tool_choice: type \"tool\" and \"any\" are not supported for this model' -- the vendored client's own _send_anthropic_tools always sets body[\"tool_choice\"] = {\"type\": \"any\"} when require_tool_call is set. A model not listed here that hits either class of error is auto-added to that behavior for the rest of the current session (logged plainly) even before a human adds a permanent entry here -- see _patch_anthropic_body_for_param_omission and _patch_http_post_for_usage_capture in src/integrations/llm/vendored_client.py.",
+  "_entries": {
+    "anthropic/claude-opus-4-7": {"omit_params": ["temperature"]},
+    "anthropic/claude-opus-4-8": {"omit_params": ["temperature"]},
+    "anthropic/claude-opus-5": {"omit_params": ["temperature"]},
+    "anthropic/claude-opus-5-5": {"omit_params": ["temperature"], "tool_choice_override": {"type": "auto"}},
+    "anthropic/claude-sonnet-5-5": {"omit_params": ["temperature"]},
+    "anthropic/claude-fable-5-1": {"omit_params": ["temperature"]}
+  }
+}
