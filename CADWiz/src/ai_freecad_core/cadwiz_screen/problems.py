@@ -16,7 +16,7 @@ from ai_freecad_core.visual_communications.anchored import inches_first
 
 #: kind -> (plain heading, how to resolve it)
 KINDS: dict[str, tuple[str, str]] = {
-    "connection": ("Claude can't reach CADWiz", "Open the Claude app (or quit it fully and open it again); the light turns green within a minute."),
+    "connection": ("Your assistant can't reach CADWiz", "Open your assistant app (Claude Desktop, or Codex for ChatGPT), or quit it fully and open it again; the light turns green within a minute."),
     "rebuild": ("A step of the model failed to rebuild", "Ask Claude to fix it, or go back to the last version that rebuilt."),
     "sketch_open": ("A sketch has a gap in its outline", "Close the gap so the outline is one closed loop; Claude can find and join the ends."),
     "sketch_broken": ("A sketch's rules contradict each other", "Remove the clashing rule (constraint); Claude can find which one."),

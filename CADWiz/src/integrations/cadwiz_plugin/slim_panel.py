@@ -65,11 +65,14 @@ CONNECTED = "Connected to Claude"
 # that means. I thought all I needed to do was open CADWiz when Claude was [open]."
 # He was right: that is all. The light was red for the first half-minute after
 # FreeCAD opened, before the Claude app's first check-in, and read like an error.
-CONNECTING = "Connecting to Claude\u2026"
-CONNECTING_TODO = "Nothing to do: the Claude app checks in within 30 seconds."
-NOT_CONNECTED = "Not connected to Claude"
-NOT_CONNECTED_TODO = ("Open the Claude app on this PC -- that is all; this turns green by itself within 30 seconds. "
-                      "If it stays red, quit the Claude app fully and open it again.")
+# ORDER-2026-10-21-01: CADWiz works with the assistant the user chose at the top
+# of the panel (Claude Desktop, or ChatGPT through Codex), so the waiting and
+# not-connected lines name neither.
+CONNECTING = "Connecting…"
+CONNECTING_TODO = "Nothing to do: your assistant app checks in within 30 seconds."
+NOT_CONNECTED = "Not connected"
+NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or Codex for ChatGPT) -- that is all; this turns "
+                      "green by itself within 30 seconds. If it stays red, press Connect.")
 #: How long after FreeCAD opens the light waits (amber) for the first check-in.
 CONNECTING_GRACE_S = 45.0
 NO_BRIDGE = "Not connected — CADWiz's plug-in did not start; close and reopen FreeCAD"

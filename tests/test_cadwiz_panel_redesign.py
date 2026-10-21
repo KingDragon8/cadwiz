@@ -24,7 +24,7 @@ def _record(version, kind="edit", diff="", note="", utc="2026-10-18T18:14:00Z", 
 def test_the_light_is_green_or_red_and_red_says_what_to_do() -> None:
     assert slim_panel.connection(SimpleNamespace(connected=True)) == {"light": slim_panel.GREEN, "line": "Connected to Claude", "todo": ""}
     off = slim_panel.connection(SimpleNamespace(connected=False))
-    assert off["light"] == slim_panel.RED and off["todo"].startswith("Open the Claude app")
+    assert off["light"] == slim_panel.RED and off["todo"].startswith("Open your assistant app")
     none = slim_panel.connection(None)
     assert none["light"] == slim_panel.RED and "close and reopen FreeCAD" in none["line"] and none["todo"]
 

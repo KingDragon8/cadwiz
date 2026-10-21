@@ -268,7 +268,7 @@ def test_the_slim_panel_lines(session) -> None:
     lines = slim_panel.panel_lines(bridge)
     # ORDER-2026-10-18-01: when not connected the light is red and says what to do.
     assert lines["connection"] == slim_panel.NOT_CONNECTED and lines["light"] == slim_panel.RED
-    assert "Open the Claude app" in lines["todo"]
+    assert "Open your assistant app" in lines["todo"]
     assert lines["working_on"] == "Working on: Cone / Cone, version 2"
     assert lines["last_change"] == "Last change: width 60 -> 70 mm"
     bridge.connected = True
