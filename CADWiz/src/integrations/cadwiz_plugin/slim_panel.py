@@ -101,7 +101,7 @@ BUTTONS: dict[str, tuple[str, str, str]] = {
     "assembly": ("Assembly", "CADWiz_View_Assembly",
                  "Pull the parts apart in the picture -- a lid lifts off its can (the model is not changed)"),
     "model": ("Model", "CADWiz_Show_Model", "The live picture of the model open in FreeCAD: mark on it and press Show"),
-    "designs": ("Designs", "CADWiz_Show_Concepts", "The pictures Claude posts before anything is 3D: pick one, then Make it 3D. "
+    "designs": ("Designs", "CADWiz_Show_Concepts", "The pictures your assistant posts before anything is 3D: pick one, then Make it 3D. "
                                                    "The number is how many rounds of pictures this design has had"),
     "drawing": ("Drawing", "CADWiz_Show_Drawing", "The technical drawing of the model: front, top and side views, a 3D view, "
                                                   "sizes in inches and mm, and a title block. Save it as a PDF to print"),
@@ -168,11 +168,11 @@ WORDMARK_PX = 26
 FOLDS = {"problems": "Problems and fixes", "versions": "Time machine"}
 
 EXAMPLE_SENTENCES = (
-    "What's open in FreeCAD right now, and how big is it?",
-    "Look at what I'm showing you. Make this wall thicker.",
-    "Measure the inside distance around the bottom opening.",
-    "Go back to the version before the last change.",
-    "Will this print on my printer? Show me any problems.",
+    "Show me three ideas for a phone stand before you build anything.",
+    "Look at what I'm showing you. Make this wall 3 mm thicker.",
+    "Add a hole here for an M4 screw, 10 mm from the edge.",
+    "Will this print on my printer? Fix anything that won't.",
+    "Something broke. Take me back to the last version that worked.",
 )
 
 

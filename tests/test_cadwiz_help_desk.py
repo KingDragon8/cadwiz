@@ -181,3 +181,35 @@ def test_get_help_opens_the_feedback_page_filled_in_with_versions_and_the_report
     url = get_help_url(freecad_version="1.1.3", os_name="Windows-10", error_code="CW-PLUGIN-FAIL", report_id="CWR-20261021-0007")
     assert url.startswith("https://cadwiz.app/feedback?section=bug&cadwiz_version=0.5.0-beta.2")
     assert "report_id=CWR-20261021-0007" in url and "error_code=CW-PLUGIN-FAIL" in url and "freecad_version=1.1.3" in url
+
+
+def test_the_panel_one_click_send_previews_offline_then_posts_picture_and_errors_privately(tmp_path: Path) -> None:
+    """ORDER-2026-10-22-04: Report a problem shows the preview (no network), and the
+    Send button posts it -- a private bug with the picture, errors, steps and versions,
+    never the model file -- without the user finding or attaching a file."""
+    from ai_freecad_core.cadwiz_screen.problems import Problem
+    from integrations.cadwiz_plugin.feedback import panel_feedback, panel_report_message
+
+    message = panel_report_message("the fillet vanished", [Problem("rebuild", "Pad failed to rebuild.", ["Pad"],
+                                                                   detail_for_claude="BRep_API: command not done")])
+    assert message.startswith("the fillet vanished") and "Pad failed to rebuild." in message and "BRep_API" in message
+    report_id = _report(tmp_path, username="maker")
+    args = panel_feedback("the fillet vanished", report_id)
+    assert args["section"] == "bug" and args["public"] is False and "model_file" not in args["include"]
+    shown = HelpDesk(tmp_path, http=NoNetwork()).send_feedback(**args)["preview"]
+    assert shown["attached"][0].startswith("screenshot.png") and shown["bundle"]["trail"]
+    site = FakeSite()
+    done = HelpDesk(tmp_path, http=site, open_browser=lambda url: None).send_feedback(**args, confirm=True)
+    if not done["sent"]:                                              # the first send signs in, the press after it sends
+        done = HelpDesk(tmp_path, http=site, open_browser=lambda url: None).send_feedback(**args, confirm=True)
+    assert done["sent"] is True
+    body = site.calls[-1][3]
+    assert b'filename="screenshot.png"' in body and b"failed" in body and b".FCStd" not in body
+
+
+def test_panel_feedback_always_meets_the_sites_length_rules() -> None:
+    from integrations.cadwiz_plugin.feedback import panel_feedback
+
+    for note in ("", "x", "a" * 400):
+        args = panel_feedback(note, "CWR-20261022-0001")
+        assert 5 <= len(args["title"]) <= 120 and 10 <= len(args["description"]) <= 5000

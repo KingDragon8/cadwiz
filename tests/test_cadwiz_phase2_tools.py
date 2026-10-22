@@ -284,19 +284,12 @@ def test_a_turned_view_is_noticed_so_marks_follow_the_pictures_own_line_of_sight
     assert view_link.ray_hit(camera, 0.5, 0.5, 1.0) is None            # outside FreeCAD (no FreeCAD module) it says "missed", never guesses
 
 
-def test_setup_usage_says_only_what_the_call_log_holds() -> None:
-    # ORDER-2026-10-19-02: no paid calls -> it says so; never a cost or a project figure.
-    empty = panel_pages.usage_lines([{"made_by": "automated run", "event": "blocked", "provider": "p"}])
-    assert empty[0] == panel_pages.CLAUDE_USAGE_LINE and "no paid AI calls" in empty[1]
-    rows = [{"made_by": "founder", "event": "usage", "provider": "p", "utc": "2026-10-12T01:00:00Z",
-             "input_tokens": 1200, "output_tokens": 30},
-            {"made_by": "founder", "event": "usage", "provider": "p", "utc": "2026-10-12T02:00:00Z",
-             "input_tokens": None, "output_tokens": 5},
-            {"made_by": "founder", "event": "sent", "provider": "p", "utc": "2026-10-12T02:00:00Z"}]
-    lines = panel_pages.usage_lines(rows)
-    assert "2 answers on 2026-10-12, 1,200 tokens sent and 35 received" in lines[1]
-    assert "never recorded what those cost" in lines[2]
-    assert "settings (Usage)" in lines[0]
+def test_setup_usage_is_one_sentence_about_the_subscription() -> None:
+    # Founder, 2026-10-22: the subscription pays, no charge per question -- nothing else.
+    rows = [{"made_by": "founder", "event": "usage", "provider": "p", "utc": "2026-10-12T01:00:00Z", "input_tokens": 1200}]
+    for log in ([], rows):
+        assert panel_pages.usage_lines(log) == [panel_pages.CLAUDE_USAGE_LINE]
+    assert "no charge per question" in panel_pages.CLAUDE_USAGE_LINE
 
 
 def test_chatgpt_turns_green_only_on_a_real_chatgpt_hello() -> None:

@@ -225,6 +225,30 @@ class HelpDesk:
                 "detail_for_claude": f"HTTP {code}: {answer.get('error', '')} {answer.get('field', '')}".strip()}
 
 
+def panel_report_message(note: str, problems: list[Any]) -> str:
+    """What the panel's Report a problem button puts in the error report: his note,
+    then every problem his screen shows, with the technical detail behind it."""
+    lines = [note.strip() or "(no note)"]
+    if problems:
+        lines.append("")
+        lines.append("Problems on screen:")
+        for problem in problems:
+            detail = str(getattr(problem, "detail_for_claude", "") or "")
+            lines.append(f"- {getattr(problem, 'what', problem)}" + (f" [{detail[:400]}]" if detail else ""))
+    return "\n".join(lines)
+
+
+def panel_feedback(note: str, report_id: str) -> dict[str, Any]:
+    """The send_feedback arguments for the panel's one-click send (ORDER-2026-10-22-04):
+    a private bug carrying the report's default items -- the picture, the error, the
+    last steps and the versions; the model file only through the assistant, on request."""
+    note = " ".join(note.split())
+    title = f"Problem: {note}"[:120] if len(note) >= 3 else "Problem reported from the CADWiz panel"
+    return {"section": "bug", "title": title, "public": False, "report_id": report_id,
+            "include": list(DEFAULT_ITEMS),
+            "description": f"{note or '(no note)'}\n\nSent with the Report a problem button in the CADWiz panel."}
+
+
 def get_help_url(*, cadwiz_version: str = CADWIZ_VERSION, freecad_version: str = "", os_name: str = "",
                  claude_desktop_version: str = "", error_code: str = "", report_id: str = "", section: str = "bug") -> str:
     """The panel's Get help button: cadwiz.app/feedback with the form pre-filled

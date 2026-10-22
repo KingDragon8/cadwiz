@@ -187,7 +187,7 @@ class DrawingScreen:
             self.svg = str(made["svg"])
             self.sheet.show_svg(self.svg)
             self.made_for = model_signature(self.panel.document())
-            self.status.setText(f"Claude made this drawing at {time.strftime('%H:%M')}. It is made again when the model changes.")
+            self.status.setText(f"Your assistant made this drawing at {time.strftime('%H:%M')}. It is made again when the model changes.")
             self._buttons()
         return True
 

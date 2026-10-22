@@ -37,31 +37,14 @@ PRINT_TIME_HONEST = ("Print time and filament: your slicer shows these when you 
                      "CADWiz can't read them from {slicer} yet.")
 
 
-CLAUDE_USAGE_LINE = ("Your talks with your assistant come out of your Claude or ChatGPT subscription -- there is no charge "
-                     "per question. The app doesn't tell CADWiz how much of it you have used; to see that, open the app's "
-                     "settings (Usage).")
+CLAUDE_USAGE_LINE = "Your talks with your assistant come out of your Claude or ChatGPT subscription. There is no charge per question."
 
 
 def usage_lines(rows: list[dict[str, Any]]) -> list[str]:
-    """The Setup page's Usage section (ORDER-2026-10-19-02), from the one local log
-    of paid AI calls CADWiz itself made (`spend_guard.log_path()`). Only what the
-    log holds: it records replies and tokens, never cost or project, so neither is
-    ever shown as a number."""
-    mine = [r for r in rows if r.get("made_by") == "founder" and r.get("event") == "usage"]
-    if not mine:
-        return [CLAUDE_USAGE_LINE, "CADWiz itself has made no paid AI calls on this computer, so it has cost you nothing."]
-    providers = sorted({str(r.get("provider") or "an AI service") for r in mine})
-    tokens_in = sum(int(r.get("input_tokens") or 0) for r in mine)
-    tokens_out = sum(int(r.get("output_tokens") or 0) for r in mine)
-    first, last = min(r.get("utc", "") for r in mine)[:10], max(r.get("utc", "") for r in mine)[:10]
-    when = f"on {last}" if first == last else f"from {first} to {last}"
-    return [
-        CLAUDE_USAGE_LINE,
-        f"CADWiz's own paid AI calls (its old built-in assistant, using your {', '.join(providers)} key): "
-        f"{len(mine):,} answers {when}, {tokens_in:,} tokens sent and {tokens_out:,} received. None since {last}.",
-        f"CADWiz never recorded what those cost or which project they were for; your {', '.join(providers)} "
-        "account's usage page shows the bill.",
-    ]
+    """The Setup page's Usage section. Founder, 2026-10-22: it says only that the
+    assistant's subscription pays and there is no charge per question; the old
+    built-in assistant's token tally is obsolete and no longer shown."""
+    return [CLAUDE_USAGE_LINE]
 
 
 CHATGPT_CONNECTED = "ChatGPT connected"
@@ -570,7 +553,7 @@ class SetupPage:
         form.addRow("Text size", self.text_size)
         column.addWidget(shop)
 
-        how, h_col = panel._section(inner, "How Claude works with you", "CADWiz_How_Claude_Works")
+        how, h_col = panel._section(inner, "How your assistant works with you", "CADWiz_How_Claude_Works")
         note = QtWidgets.QLabel("Your assistant reads these through CADWiz and follows them. For lessons, ask it in its app "
                                 "(“teach me how fillets work”).", how)
         note.setWordWrap(True)
@@ -641,7 +624,7 @@ class SetupPage:
         help_box, x_col = panel._section(inner, "Help")
         from integrations.cadwiz_plugin.slim_panel import EXAMPLE_SENTENCES
 
-        x_col.addWidget(QtWidgets.QLabel("Five things to say to your assistant:", help_box))
+        x_col.addWidget(QtWidgets.QLabel("Try saying to your assistant:", help_box))
         for sentence in EXAMPLE_SENTENCES:
             row = QtWidgets.QHBoxLayout()
             words = QtWidgets.QLabel(f"“{sentence}”", help_box)
@@ -651,14 +634,49 @@ class SetupPage:
             row.addWidget(words, 1)
             row.addWidget(copy)
             x_col.addLayout(row)
+        # Users do not guess that the chat itself can file a report; say so beside the button.
+        easiest = QtWidgets.QLabel("<b>Easiest:</b> just tell your assistant <i>“Send this problem to the CADWiz team.”</i> "
+                                   "It writes the report and shows it to you before anything is sent.", help_box)
+        easiest.setObjectName("CADWiz_Report_By_Chat")
+        easiest.setWordWrap(True)
+        easiest.setStyleSheet(f"background: #EEF2F8; border-left: 4px solid {panel.FOUNDER_BLUE}; padding: 4px 6px;")
+        x_col.addWidget(easiest)
         self.report_note = QtWidgets.QLineEdit(help_box)
         self.report_note.setPlaceholderText("What went wrong, in a few words")
         report = QtWidgets.QPushButton("Report a problem", help_box)
         report.setObjectName("CADWiz_Report_Problem")
         report.clicked.connect(self.report)
-        self.report_result = QtWidgets.QLabel("Saves a picture of FreeCAD and your note, and copies a report to paste into your assistant's chat.",
-                                              help_box)
+        self.report_result = QtWidgets.QLabel("Takes a picture of FreeCAD, adds the errors and your note, and shows you "
+                                              "exactly what would go before you press Send.", help_box)
         self.report_result.setWordWrap(True)
+        # ORDER-2026-10-22-04: the one-click send. Report a problem shows this preview;
+        # pressing Send is the user's yes. The sending itself is feedback.py's, on a
+        # background thread -- the window keeps answering while cadwiz.app is asked.
+        self.report_preview = QtWidgets.QFrame(help_box)
+        self.report_preview.setObjectName("CADWiz_Report_Preview")
+        self.report_preview.setStyleSheet("QFrame#CADWiz_Report_Preview { border: 1px solid #C9D2E0; background: #FAFBFD; }")
+        p_col = QtWidgets.QVBoxLayout(self.report_preview)
+        self.report_picture = QtWidgets.QLabel(self.report_preview)
+        self.report_preview_text = QtWidgets.QLabel(self.report_preview)
+        self.report_preview_text.setObjectName("CADWiz_Report_Preview_Text")
+        self.report_preview_text.setWordWrap(True)
+        self.report_preview_text.setTextFormat(panel.QtCore.Qt.PlainText)
+        send_row = QtWidgets.QHBoxLayout()
+        self.report_send = QtWidgets.QPushButton("Send to the CADWiz team", self.report_preview)
+        self.report_send.setObjectName("CADWiz_Report_Send")
+        self.report_send.setProperty("role", "primary")
+        self.report_send.clicked.connect(self.send_report)
+        not_now = QtWidgets.QPushButton("Don't send", self.report_preview)
+        not_now.setObjectName("CADWiz_Report_Not_Now")
+        not_now.clicked.connect(self.cancel_report)
+        send_row.addWidget(self.report_send)
+        send_row.addWidget(not_now)
+        send_row.addStretch(1)
+        p_col.addWidget(self.report_picture)
+        p_col.addWidget(self.report_preview_text)
+        p_col.addLayout(send_row)
+        self.report_preview.hide()
+        self._pending_send: dict[str, Any] | None = None
         # ORDER-2026-10-21-01 (Addendum One B3): Get help opens cadwiz.app/feedback with the
         # form filled in -- versions, and the report id when there is a recent report.
         get_help = QtWidgets.QPushButton("Get help", help_box)
@@ -672,6 +690,7 @@ class SetupPage:
         buttons.addWidget(get_help)
         x_col.addLayout(buttons)
         x_col.addWidget(self.report_result)
+        x_col.addWidget(self.report_preview)
         column.addWidget(help_box)
 
         from integrations.cadwiz_plugin.slim_panel import _build_line
@@ -805,8 +824,8 @@ class SetupPage:
         document = panel.document()
         lines.append(f"Open model: {document.Label if document is not None else 'none'}")
         session = panel.session()
-        log = Path(getattr(session, "log_path", "") or "") if session is not None else None
-        if log is not None and log.is_file():
+        log = Path(getattr(session, "log_path", "") or "") if session is not None else plugin_data_dir() / "tool-calls.jsonl"
+        if log.is_file():
             with contextlib.suppress(Exception):
                 for row in log.read_text(encoding="utf-8").splitlines()[-10:]:
                     entry = json.loads(row)
@@ -814,6 +833,12 @@ class SetupPage:
         if picture.is_file():
             lines.append(f"Picture: {picture}")
         from integrations.cadwiz_plugin.error_report import write_report
+        from integrations.cadwiz_plugin.feedback import panel_report_message
+
+        note = self.report_note.text().strip()
+        problems = list(getattr(getattr(panel, "problems_card", None), "problems", []) or [])
+        for problem in problems:
+            lines.append(f"Problem on screen: {problem.what}")
 
         def copy_picture(path: Path) -> bool:
             if not picture.is_file():
@@ -821,18 +846,107 @@ class SetupPage:
             path.write_bytes(picture.read_bytes())
             return True
 
-        if log is not None:
-            self.last_report_id = write_report(
-                plugin_data_dir(), error_code="CW-PANEL-REPORT", message=self.report_note.text().strip() or "(no note)",
-                tool="report_a_problem", log_path=log, grab_window=copy_picture,
-                model_file=str(getattr(document, "FileName", "") or ""), version_info=self._versions())
+        self.last_report_id = write_report(
+            plugin_data_dir(), error_code="CW-PANEL-REPORT", message=panel_report_message(note, problems),
+            tool="report_a_problem", log_path=log, grab_window=copy_picture,
+            model_file=str(getattr(document, "FileName", "") or ""), version_info=self._versions())
         if self.last_report_id:
             lines.insert(1, f"Report id: {self.last_report_id}")
         text = "\n".join(lines)
         (folder / f"report-{stamp}.txt").write_text(text, encoding="utf-8")
         panel.QtWidgets.QApplication.clipboard().setText(text)
-        self.report_result.setText("Copied. Paste it into your assistant's chat" + (f" and attach the picture {picture.name} from {folder}." if picture.is_file() else ".")
-                                   + (f" Or press Get help to send report {self.last_report_id} on cadwiz.app." if self.last_report_id else ""))
+        if not self.last_report_id or not self._show_preview(note, picture):
+            self.report_result.setText("Copied. Paste it into your assistant's chat" + (f" and attach the picture {picture.name} from {folder}." if picture.is_file() else ".")
+                                       + (f" Or press Get help to send report {self.last_report_id} on cadwiz.app." if self.last_report_id else ""))
+
+    def _help_desk(self) -> Any:
+        from integrations.cadwiz_plugin.feedback import HelpDesk
+        from integrations.cadwiz_plugin.session import plugin_data_dir
+
+        return HelpDesk(plugin_data_dir())
+
+    def _show_preview(self, note: str, picture: Path) -> bool:
+        """Show exactly what Send would post -- the help desk's own preview, no network."""
+        from integrations.cadwiz_plugin.feedback import panel_feedback
+
+        args = panel_feedback(note, self.last_report_id)
+        try:
+            shown = self._help_desk().send_feedback(**args)["preview"]
+        except Exception:  # noqa: BLE001 - no preview, no Send: the copy-and-paste way still works
+            return False
+        bundle = shown.get("bundle", {})
+        steps = bundle.get("trail", [])
+        failed = sum(1 for step in steps if str(step.get("result", "")).startswith("failed"))
+        found = bundle.get("versions", {})
+        words = ["This goes privately to the CADWiz team (only they can read it):",
+                 f"• Your note: {note or '(none)'}",
+                 *(f"• The picture: {item}" for item in shown.get("attached", [])),
+                 f"• The errors and what CADWiz was doing: the last {len(steps)} steps" + (f", {failed} of them failed" if failed else ""),
+                 f"• Versions: CADWiz {found.get('cadwiz', '?')}, FreeCAD {found.get('freecad', '?')}",
+                 "Your model file is not sent. Folder names and your user name are taken out."]
+        self.report_preview_text.setText("\n".join(words))
+        self.report_picture.clear()
+        if picture.is_file():
+            pixmap = self.panel.QtGui.QPixmap(str(picture))
+            if not pixmap.isNull():
+                self.report_picture.setPixmap(pixmap.scaledToWidth(240, self.panel.QtCore.Qt.SmoothTransformation))
+        self._pending_send = args
+        self.report_send.setEnabled(True)
+        self.report_preview.show()
+        self.report_result.setText("Check what will be sent, then press Send. (It's also copied, to paste into your assistant's chat.)")
+        return True
+
+    def cancel_report(self) -> None:
+        self._pending_send = None
+        self.report_preview.hide()
+        self.report_result.setText(f"Not sent. The report stays on this computer ({self.last_report_id}).")
+
+    def send_report(self) -> None:
+        """The user pressed Send: that is the yes. cadwiz.app is asked on a background
+        thread; a timer on the window thread collects the answer."""
+        import threading
+
+        args = self._pending_send
+        if not args:
+            return
+        self.report_send.setEnabled(False)
+        self.report_result.setText("Sending...")
+        desk = self._help_desk()
+        box: dict[str, Any] = {}
+
+        def run() -> None:
+            try:
+                box["result"] = desk.send_feedback(**args, confirm=True)
+            except Exception as error:  # noqa: BLE001 - shown as one plain sentence below
+                box["result"] = {"ok": False, "sent": False, "say_to_founder": "It could not be sent; nothing was posted.",
+                                 "detail_for_claude": f"{type(error).__name__}: {error}"}
+
+        worker = threading.Thread(target=run, name="cadwiz-report-send", daemon=True)
+        worker.start()
+        timer = self.panel.QtCore.QTimer(self.report_preview)
+
+        def collect() -> None:
+            if worker.is_alive():
+                return
+            timer.stop()
+            self._sent(box.get("result", {}))
+
+        timer.timeout.connect(collect)
+        timer.start(150)
+
+    def _sent(self, result: dict[str, Any]) -> None:
+        said = str(result.get("say_to_founder") or ("Sent." if result.get("sent") else "Not sent."))
+        if result.get("sent"):
+            self._pending_send = None
+            self.report_preview.hide()
+            self.report_result.setText(f"{said} Report {self.last_report_id}.")
+        elif result.get("sign_in_url"):
+            self.report_send.setEnabled(True)
+            self.report_result.setText("Nothing is sent yet. The first time, cadwiz.app asks who you are: a sign-in page has opened "
+                                       "in your browser. Enter your email, press the link in the email, then press Send again.")
+        else:
+            self.report_send.setEnabled(True)
+            self.report_result.setText(said)
 
     @staticmethod
     def _versions() -> dict[str, str]:
