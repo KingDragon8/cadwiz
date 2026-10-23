@@ -26,7 +26,6 @@ worse one.
 from __future__ import annotations
 
 import asyncio
-import sys
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
@@ -360,7 +359,9 @@ def _measure_probe(
     # minute." Derived here, once, from the real interpreter's own
     # directory, so it is `freecadcmd.exe` regardless of whether this
     # session is itself the GUI or the headless build.
-    worker_exe = str(Path(sys.executable).resolve().with_name("freecadcmd.exe"))
+    from integrations.mcp_tools.isolated import headless_freecad_exe
+
+    worker_exe = str(headless_freecad_exe())
     return f'''
 import subprocess as _subprocess_
 import sys as _sys_

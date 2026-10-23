@@ -50,6 +50,8 @@ def run() -> int:
     seen = session.call("inspect_document", {"document": "LoadCheck"})
     whole = seen.get("ok") and "Box" in str(seen)
     say(f"plug-in session reads a model in FreeCAD: {'PASS' if whole else 'FAIL'}")
+    if not whole:
+        say("what it answered: " + str(seen)[:3000])
     return 0 if code == 0 and whole else 1
 
 
@@ -59,4 +61,5 @@ except Exception:  # noqa: BLE001
     say("FAIL:\n" + traceback.format_exc())
     result = 1
 OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+sys.stdout.flush()   # os._exit skips the flush: without it a piped log shows nothing
 os._exit(result)

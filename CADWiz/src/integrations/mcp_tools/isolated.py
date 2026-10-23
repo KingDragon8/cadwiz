@@ -16,6 +16,7 @@ propagates; nothing the helper did ever reached the user's document.
 from __future__ import annotations
 
 import queue
+import shutil
 import subprocess
 import sys
 import threading
@@ -27,8 +28,23 @@ from pathlib import Path
 from . import progress
 
 
+#: FreeCAD's windowless build: `freecadcmd.exe` on Windows, `freecadcmd` on macOS and
+#: Linux (older builds spell it FreeCADCmd). Found beside the running interpreter.
+HEADLESS_NAMES = ("freecadcmd.exe", "FreeCADCmd.exe") if sys.platform == "win32" else ("freecadcmd", "FreeCADCmd")
+_WINDOWS_FALLBACK = Path(r"C:\Program Files\FreeCAD 1.1\bin\freecadcmd.exe")
+
+
 def headless_freecad_exe() -> Path:
-    return Path(sys.executable).resolve().with_name("freecadcmd.exe")
+    here = Path(sys.executable).resolve().parent
+    for name in HEADLESS_NAMES:
+        if (here / name).exists():
+            return here / name
+    for name in HEADLESS_NAMES:
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    # Nothing found: name the usual place, so the failure says where it looked.
+    return _WINDOWS_FALLBACK if sys.platform == "win32" else here / HEADLESS_NAMES[0]
 
 
 def headless_available() -> bool:
