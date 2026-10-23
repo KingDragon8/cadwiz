@@ -60,7 +60,10 @@ if (-not (Test-Path -LiteralPath (Join-Path $Source "InitGui.py"))) { throw "The
 
 # ---- 1. FreeCAD 1.1 -------------------------------------------------------------------
 if (-not $FreeCADBin) {
-    $found = Get-ChildItem "C:\Program Files\FreeCAD 1.*\bin\freecad.exe" -ErrorAction SilentlyContinue |
+    # FreeCAD installs for everyone (Program Files) or "just for me" (the user's own
+    # Programs folder); look in both.
+    $found = @("$env:ProgramFiles\FreeCAD 1.*\bin\freecad.exe", "$env:LOCALAPPDATA\Programs\FreeCAD 1.*\bin\freecad.exe") |
+        ForEach-Object { Get-ChildItem $_ -ErrorAction SilentlyContinue } |
         Sort-Object FullName -Descending | Select-Object -First 1
     if ($found) { $FreeCADBin = Split-Path -Parent $found.FullName }
 }
