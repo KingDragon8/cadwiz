@@ -50,6 +50,8 @@ def run() -> int:
     seen = session.call("inspect_document", {"document": "LoadCheck"})
     whole = seen.get("ok") and "Box" in str(seen)
     say(f"plug-in session reads a model in FreeCAD: {'PASS' if whole else 'FAIL'}")
+    if not whole:
+        say("what it answered: " + str(seen)[:3000])
     return 0 if code == 0 and whole else 1
 
 
