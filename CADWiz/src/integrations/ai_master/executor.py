@@ -17,7 +17,6 @@ import os
 import queue
 import re
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -32,13 +31,15 @@ from ai_freecad_core.ai_master.units import Quantity, UnitError, parse_quantity
 from integrations.mcp_tools.cadwiz_sandbox import DEFAULT_MEMORY_LIMIT_BYTES, DEFAULT_TIME_LIMIT_SECONDS
 
 WORKER = Path(__file__).resolve().with_name("worker.py")
-_FALLBACK_FREECADCMD = Path(r"C:\Program Files\FreeCAD 1.1\bin\freecadcmd.exe")
 _EXPORT_EXT = {"stl": ".stl", "3mf": ".3mf", "step": ".step", "fcstd": ".FCStd"}
 
 
 def find_freecadcmd() -> Path:
-    sibling = Path(sys.executable).resolve().with_name("freecadcmd.exe")
-    return sibling if sibling.exists() else _FALLBACK_FREECADCMD
+    # One finder for every platform (freecadcmd.exe on Windows, freecadcmd on macOS
+    # and Linux) -- the public CI's Linux FreeCAD found the old Windows-only path.
+    from integrations.mcp_tools.isolated import headless_freecad_exe
+
+    return headless_freecad_exe()
 
 
 class WorkerFailed(RuntimeError):
