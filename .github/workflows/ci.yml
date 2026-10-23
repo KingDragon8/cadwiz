@@ -67,4 +67,10 @@ jobs:
       - name: Install the connector's one package into FreeCAD's Python
         run: squashfs-root/usr/bin/python -m pip install --user "mcp==1.27.0"
       - name: Load check
-        run: squashfs-root/usr/bin/freecadcmd scripts/ci/freecad_load_check.py && cat freecad-load-check.txt
+        # The result file is shown whether the check passes or fails.
+        run: |
+          set +e
+          squashfs-root/usr/bin/freecadcmd scripts/ci/freecad_load_check.py
+          status=$?
+          cat freecad-load-check.txt 2>/dev/null || echo "freecad-load-check.txt was not written"
+          exit $status
