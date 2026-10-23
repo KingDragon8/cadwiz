@@ -32,7 +32,7 @@
 param(
     [switch]$SourceOnly,
     [string]$ModDir = (Join-Path $env:APPDATA "FreeCAD\v1-1\Mod"),
-    [string]$ClaudeConfig = (Join-Path $env:APPDATA "Claude\claude_desktop_config.json"),
+    [string]$ClaudeConfig = "",
     [string]$CodexConfig = (Join-Path $env:USERPROFILE ".codex\config.toml"),
     [string]$FreeCADBin = "",
     [string]$StartMenuDir = (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\CADWiz"),
@@ -90,10 +90,16 @@ $AddonPath = $Source
 if (-not $SourceOnly) {
     New-Item -ItemType Directory -Path $ModDir -Force | Out-Null
     $target = Join-Path $ModDir "CADWiz"
-    if (Test-Path -LiteralPath $target) {
-        $kept = Join-Path $ModDir "CADWiz.backup.$Stamp"
-        Move-Item -LiteralPath $target -Destination $kept
-        $Changed.Add("Kept your earlier CADWiz as $kept")
+    # An earlier CADWiz is kept OUTSIDE FreeCAD's Mod folder: FreeCAD loads every folder
+    # in Mod, so a backup left there would still start with FreeCAD (ORDER-2026-10-23-02).
+    $backups = Join-Path $DataDir "backups"
+    $earlier = @(Get-Item -LiteralPath $target -ErrorAction SilentlyContinue) +
+               @(Get-ChildItem -LiteralPath $ModDir -Directory -Filter "CADWiz.backup.*" -ErrorAction SilentlyContinue)
+    foreach ($old in $earlier) {
+        New-Item -ItemType Directory -Path $backups -Force | Out-Null
+        $kept = Join-Path $backups "$($old.Name).$Stamp"
+        Move-Item -LiteralPath $old.FullName -Destination $kept
+        $Changed.Add("Moved your earlier CADWiz ($($old.Name)) out of FreeCAD, to $kept")
     }
     Copy-Item -LiteralPath $Source -Destination $target -Recurse
     Get-ChildItem -LiteralPath $target -Directory -Recurse -Filter "__pycache__" | Remove-Item -Recurse -Force
@@ -110,6 +116,16 @@ if (-not $NoPip) {
 }
 
 # ---- 4. Claude Desktop's settings ---------------------------------------------------------
+# Claude Desktop from claude.ai/download is a Microsoft Store (MSIX) app: it reads its
+# settings from its own package folder, never from %APPDATA%\Claude. Writing only the
+# %APPDATA% file left the founder's laptop red forever (ORDER-2026-10-23-02).
+if (-not $ClaudeConfig) {
+    $package = Get-ChildItem (Join-Path $env:LOCALAPPDATA "Packages") -Directory -Filter "Claude_*" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    $ClaudeConfig = if ($package) { Join-Path $package.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json" }
+                    else { Join-Path $env:APPDATA "Claude\claude_desktop_config.json" }
+}
+Write-Host "Claude Desktop's settings: $ClaudeConfig"
 $server = Join-Path $AddonPath "src\integrations\cadwiz_plugin\server.py"
 $configDir = Split-Path -Parent $ClaudeConfig
 New-Item -ItemType Directory -Path $configDir -Force | Out-Null

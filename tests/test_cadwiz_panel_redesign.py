@@ -35,7 +35,8 @@ def test_just_after_freecad_opens_the_light_is_amber_connecting_not_a_red_error(
     early = slim_panel.connection(waiting, seconds_open=10)
     assert early["light"] == slim_panel.AMBER and early["line"].startswith("Connecting") and "Nothing to do" in early["todo"]
     late = slim_panel.connection(waiting, seconds_open=slim_panel.CONNECTING_GRACE_S + 1)
-    assert late["light"] == slim_panel.RED and "that is all" in late["todo"]
+    # ORDER-2026-10-23-02: red with the app open is fixed by quitting the app fully; the line says so.
+    assert late["light"] == slim_panel.RED and "Quit the app fully" in late["todo"]
     lost = slim_panel.connection(SimpleNamespace(connected=False, last_hello=123.0), seconds_open=10)
     assert lost["light"] == slim_panel.RED                      # it was connected and went away: say so at once
 
