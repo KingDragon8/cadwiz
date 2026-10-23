@@ -8,7 +8,7 @@ who already use GitHub.
 
 ## Running it from source
 
-1. Install **FreeCAD 1.1.3** and **Claude Desktop**.
+1. Install the latest **FreeCAD 1.1** (1.1.4 today) and **Claude Desktop**.
 2. Clone this repository and copy (or link) the `CADWiz` folder into FreeCAD's
    `Mod` folder (`%APPDATA%\FreeCAD\v1-1\Mod` on Windows).
 3. Install the one extra package into FreeCAD's own Python:

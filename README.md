@@ -16,7 +16,7 @@ app **you** choose: **Claude** or **ChatGPT**. Pick one at the top of the panel,
 or let CADWiz use whichever is open. CADWiz does the work in FreeCAD; the app is
 just how you talk to it. CADWiz makes no paid calls of its own.
 
-![The CADWiz panel docked in FreeCAD 1.1.3](docs/img/cadwiz-panel-in-freecad.png)
+![The CADWiz panel docked in FreeCAD](docs/img/cadwiz-panel-in-freecad.png)
 
 *The CADWiz panel in FreeCAD, freshly installed (real screenshot; no assistant connected yet, so the light is red).*
 
@@ -57,7 +57,7 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
 
 ## What you need
 
-- **FreeCAD 1.1.3** (1.1 or newer): [freecad.org/downloads](https://www.freecad.org/downloads.php)
+- **FreeCAD 1.1 or newer**, the latest release is best (1.1.4 today): [freecad.org/downloads](https://www.freecad.org/downloads.php)
 - **One assistant app, your choice:**
   - **Claude Desktop** ([claude.ai/download](https://claude.ai/download)), with a Claude subscription, **or**
   - **the ChatGPT desktop app** ([chatgpt.com/download](https://chatgpt.com/download)),

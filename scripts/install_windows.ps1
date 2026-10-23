@@ -68,14 +68,25 @@ if (-not $FreeCADBin) {
     if ($found) { $FreeCADBin = Split-Path -Parent $found.FullName }
 }
 $freecadOk = $false
+$version = ""
 if ($FreeCADBin -and (Test-Path -LiteralPath (Join-Path $FreeCADBin "freecad.exe"))) {
-    $version = (Get-Item -LiteralPath (Join-Path $FreeCADBin "freecad.exe")).VersionInfo.ProductVersion
-    $freecadOk = ($FreeCADBin -match 'FreeCAD 1\.(1|[2-9])') -or ($version -match '^1\.(1|[2-9])')
-    Write-Host "FreeCAD found: $FreeCADBin ($version)"
+    # Ask FreeCAD itself ("FreeCAD 1.1.4 Revision: ..."): the folder name and the file's
+    # version stamp are not reliable -- a portable FreeCAD_1.1.4-... folder has neither
+    # in the expected form, and was refused (ORDER-2026-10-23-02).
+    $cmd = Join-Path $FreeCADBin "freecadcmd.exe"
+    if (Test-Path -LiteralPath $cmd) {
+        $said = (& $cmd --version 2>$null | Select-Object -First 1)
+        if ($said -match 'FreeCAD (\d+)\.(\d+)(\.\d+)?') { $version = $Matches[0] -replace '^FreeCAD ', '' }
+    }
+    if (-not $version) { $version = (Get-Item -LiteralPath (Join-Path $FreeCADBin "freecad.exe")).VersionInfo.ProductVersion }
+    $freecadOk = ($version -match '^(1\.(1|[2-9])|[2-9]\.)') -or (-not $version -and $FreeCADBin -match 'FreeCAD[ _]1\.(1|[2-9])')
+    Write-Host "FreeCAD found: $FreeCADBin (version $version)"
 }
 if (-not $freecadOk) {
-    Write-Host "CADWiz needs FreeCAD 1.1 or newer, and it was not found on this computer." -ForegroundColor Yellow
-    if (Ask "Open FreeCAD's official download page now? (You install it, then run this installer again.)") {
+    $what = if ($version) { "FreeCAD $version was found, but CADWiz needs FreeCAD 1.1 or newer." } else { "CADWiz needs FreeCAD 1.1 or newer, and it was not found on this computer." }
+    Write-Host "$what Get the latest from $FreeCADDownload (free)." -ForegroundColor Yellow
+    # Unattended runs (-Yes) never open a browser.
+    if (-not $Yes -and (Ask "Open FreeCAD's official download page now? (You install it, then run this installer again.)")) {
         Start-Process $FreeCADDownload
         Write-Host "Opened $FreeCADDownload. Install FreeCAD 1.1, then run this installer again."
     } else {
