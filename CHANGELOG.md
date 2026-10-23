@@ -1,6 +1,20 @@
 # Changelog
 
-## v0.5.0-beta.2 (not yet released): the first open-source release, an early beta
+## v0.5.0-beta.3: fixes from the first tester install
+
+- **Readable under FreeCAD's dark theme.** With "FreeCAD Dark" chosen, the panel
+  drew white text on its white buttons; it now keeps its own colours.
+- **The connection light turns green with Claude Desktop from claude.ai/download.**
+  That Claude Desktop is a Microsoft Store app and reads its settings from its own
+  folder; the installer now writes CADWiz's entry there.
+- **A CADWiz shortcut:** the Start menu (and, if you say yes, the desktop) gets
+  CADWiz, which opens FreeCAD and your assistant app together, and Uninstall CADWiz.
+- An earlier CADWiz is moved out of FreeCAD's Mod folder, so only one starts.
+- FreeCAD installed "just for me" is found too.
+- Report a problem sends in one press, with the picture and the errors.
+- On macOS and Linux, CADWiz finds FreeCAD's windowless helper (reading a model failed there).
+
+## v0.5.0-beta.2: the first open-source release, an early beta
 
 CADWiz is now open source under LGPL-2.1-or-later, and this is an **early
 release**. Please use it on real projects and tell us what happens: in CADWiz

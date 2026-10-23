@@ -179,7 +179,9 @@ def test_get_help_opens_the_feedback_page_filled_in_with_versions_and_the_report
     from integrations.cadwiz_plugin.feedback import get_help_url
 
     url = get_help_url(freecad_version="1.1.3", os_name="Windows-10", error_code="CW-PLUGIN-FAIL", report_id="CWR-20261021-0007")
-    assert url.startswith("https://cadwiz.app/feedback?section=bug&cadwiz_version=0.5.0-beta.2")
+    from integrations.cadwiz_plugin import CADWIZ_VERSION
+
+    assert url.startswith(f"https://cadwiz.app/feedback?section=bug&cadwiz_version={CADWIZ_VERSION}")
     assert "report_id=CWR-20261021-0007" in url and "error_code=CW-PLUGIN-FAIL" in url and "freecad_version=1.1.3" in url
 
 

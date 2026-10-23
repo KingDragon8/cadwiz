@@ -43,7 +43,7 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 
 ## Status
 
-**v0.5.0-beta.2, early release.**
+**v0.5.0-beta.3, early release.**
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;
