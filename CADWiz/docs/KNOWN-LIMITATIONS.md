@@ -6,13 +6,13 @@ https://cadwiz.app/feedback/status.
 
 ## Where it runs
 
-- **Windows** is the most tested: CADWiz is used daily there with FreeCAD 1.1.3
+- **Windows** is the most tested: CADWiz is used daily there with the latest FreeCAD 1.1 (1.1.4 today)
   and Claude Desktop.
 - **macOS and Linux**: the code is written to work, and the automatic checks load
   it in FreeCAD on Linux without a window, but nobody has used it day to day on
   either yet. Reports are very welcome.
-- **FreeCAD 1.1.3** is the version it is tested with. Older versions are not
-  supported.
+- **FreeCAD 1.1 or newer** is needed; it is tested with the latest release (1.1.4
+  today, and 1.1.3). Older versions are not supported.
 
 ## What you need
 

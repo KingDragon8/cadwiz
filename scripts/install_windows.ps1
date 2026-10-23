@@ -32,7 +32,7 @@
 param(
     [switch]$SourceOnly,
     [string]$ModDir = (Join-Path $env:APPDATA "FreeCAD\v1-1\Mod"),
-    [string]$ClaudeConfig = (Join-Path $env:APPDATA "Claude\claude_desktop_config.json"),
+    [string]$ClaudeConfig = "",
     [string]$CodexConfig = (Join-Path $env:USERPROFILE ".codex\config.toml"),
     [string]$FreeCADBin = "",
     [string]$StartMenuDir = (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\CADWiz"),
@@ -68,14 +68,25 @@ if (-not $FreeCADBin) {
     if ($found) { $FreeCADBin = Split-Path -Parent $found.FullName }
 }
 $freecadOk = $false
+$version = ""
 if ($FreeCADBin -and (Test-Path -LiteralPath (Join-Path $FreeCADBin "freecad.exe"))) {
-    $version = (Get-Item -LiteralPath (Join-Path $FreeCADBin "freecad.exe")).VersionInfo.ProductVersion
-    $freecadOk = ($FreeCADBin -match 'FreeCAD 1\.(1|[2-9])') -or ($version -match '^1\.(1|[2-9])')
-    Write-Host "FreeCAD found: $FreeCADBin ($version)"
+    # Ask FreeCAD itself ("FreeCAD 1.1.4 Revision: ..."): the folder name and the file's
+    # version stamp are not reliable -- a portable FreeCAD_1.1.4-... folder has neither
+    # in the expected form, and was refused (ORDER-2026-10-23-02).
+    $cmd = Join-Path $FreeCADBin "freecadcmd.exe"
+    if (Test-Path -LiteralPath $cmd) {
+        $said = (& $cmd --version 2>$null | Select-Object -First 1)
+        if ($said -match 'FreeCAD (\d+)\.(\d+)(\.\d+)?') { $version = $Matches[0] -replace '^FreeCAD ', '' }
+    }
+    if (-not $version) { $version = (Get-Item -LiteralPath (Join-Path $FreeCADBin "freecad.exe")).VersionInfo.ProductVersion }
+    $freecadOk = ($version -match '^(1\.(1|[2-9])|[2-9]\.)') -or (-not $version -and $FreeCADBin -match 'FreeCAD[ _]1\.(1|[2-9])')
+    Write-Host "FreeCAD found: $FreeCADBin (version $version)"
 }
 if (-not $freecadOk) {
-    Write-Host "CADWiz needs FreeCAD 1.1 or newer, and it was not found on this computer." -ForegroundColor Yellow
-    if (Ask "Open FreeCAD's official download page now? (You install it, then run this installer again.)") {
+    $what = if ($version) { "FreeCAD $version was found, but CADWiz needs FreeCAD 1.1 or newer." } else { "CADWiz needs FreeCAD 1.1 or newer, and it was not found on this computer." }
+    Write-Host "$what Get the latest from $FreeCADDownload (free)." -ForegroundColor Yellow
+    # Unattended runs (-Yes) never open a browser.
+    if (-not $Yes -and (Ask "Open FreeCAD's official download page now? (You install it, then run this installer again.)")) {
         Start-Process $FreeCADDownload
         Write-Host "Opened $FreeCADDownload. Install FreeCAD 1.1, then run this installer again."
     } else {
@@ -90,10 +101,16 @@ $AddonPath = $Source
 if (-not $SourceOnly) {
     New-Item -ItemType Directory -Path $ModDir -Force | Out-Null
     $target = Join-Path $ModDir "CADWiz"
-    if (Test-Path -LiteralPath $target) {
-        $kept = Join-Path $ModDir "CADWiz.backup.$Stamp"
-        Move-Item -LiteralPath $target -Destination $kept
-        $Changed.Add("Kept your earlier CADWiz as $kept")
+    # An earlier CADWiz is kept OUTSIDE FreeCAD's Mod folder: FreeCAD loads every folder
+    # in Mod, so a backup left there would still start with FreeCAD (ORDER-2026-10-23-02).
+    $backups = Join-Path $DataDir "backups"
+    $earlier = @(Get-Item -LiteralPath $target -ErrorAction SilentlyContinue) +
+               @(Get-ChildItem -LiteralPath $ModDir -Directory -Filter "CADWiz.backup.*" -ErrorAction SilentlyContinue)
+    foreach ($old in $earlier) {
+        New-Item -ItemType Directory -Path $backups -Force | Out-Null
+        $kept = Join-Path $backups "$($old.Name).$Stamp"
+        Move-Item -LiteralPath $old.FullName -Destination $kept
+        $Changed.Add("Moved your earlier CADWiz ($($old.Name)) out of FreeCAD, to $kept")
     }
     Copy-Item -LiteralPath $Source -Destination $target -Recurse
     Get-ChildItem -LiteralPath $target -Directory -Recurse -Filter "__pycache__" | Remove-Item -Recurse -Force
@@ -110,6 +127,16 @@ if (-not $NoPip) {
 }
 
 # ---- 4. Claude Desktop's settings ---------------------------------------------------------
+# Claude Desktop from claude.ai/download is a Microsoft Store (MSIX) app: it reads its
+# settings from its own package folder, never from %APPDATA%\Claude. Writing only the
+# %APPDATA% file left the founder's laptop red forever (ORDER-2026-10-23-02).
+if (-not $ClaudeConfig) {
+    $package = Get-ChildItem (Join-Path $env:LOCALAPPDATA "Packages") -Directory -Filter "Claude_*" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    $ClaudeConfig = if ($package) { Join-Path $package.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json" }
+                    else { Join-Path $env:APPDATA "Claude\claude_desktop_config.json" }
+}
+Write-Host "Claude Desktop's settings: $ClaudeConfig"
 $server = Join-Path $AddonPath "src\integrations\cadwiz_plugin\server.py"
 $configDir = Split-Path -Parent $ClaudeConfig
 New-Item -ItemType Directory -Path $configDir -Force | Out-Null

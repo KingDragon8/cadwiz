@@ -2,7 +2,7 @@
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
   <name>CADWiz</name>
   <description>A smart CAD buddy for 3D-printer owners: a panel in every FreeCAD workbench to see, mark, measure, build and edit your models, keep every change as a version, and check parts against your printer. You talk to it through the assistant app you choose: Claude Desktop or the ChatGPT desktop app.</description>
-  <version>0.5.0-beta.2</version>
+  <version>0.5.0-beta.3</version>
   <date>2026-10-21</date>
   <maintainer email="sgregerson8888@gmail.com">Steve Gregerson (WizLabs)</maintainer>
   <author>Steve Gregerson (WizLabs)</author>

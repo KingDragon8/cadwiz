@@ -16,7 +16,7 @@ app **you** choose: **Claude** or **ChatGPT**. Pick one at the top of the panel,
 or let CADWiz use whichever is open. CADWiz does the work in FreeCAD; the app is
 just how you talk to it. CADWiz makes no paid calls of its own.
 
-![The CADWiz panel docked in FreeCAD 1.1.3](docs/img/cadwiz-panel-in-freecad.png)
+![The CADWiz panel docked in FreeCAD](docs/img/cadwiz-panel-in-freecad.png)
 
 *The CADWiz panel in FreeCAD, freshly installed (real screenshot; no assistant connected yet, so the light is red).*
 
@@ -43,7 +43,7 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 
 ## Status
 
-**v0.5.0-beta.2, early release.**
+**v0.5.0-beta.3, early release.**
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;
@@ -57,7 +57,7 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
 
 ## What you need
 
-- **FreeCAD 1.1.3** (1.1 or newer): [freecad.org/downloads](https://www.freecad.org/downloads.php)
+- **FreeCAD 1.1 or newer**, the latest release is best (1.1.4 today): [freecad.org/downloads](https://www.freecad.org/downloads.php)
 - **One assistant app, your choice:**
   - **Claude Desktop** ([claude.ai/download](https://claude.ai/download)), with a Claude subscription, **or**
   - **the ChatGPT desktop app** ([chatgpt.com/download](https://chatgpt.com/download)),
@@ -69,7 +69,9 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
 **Windows (recommended):**
 1. Download the latest `cadwiz-<version>.zip` from
    [cadwiz.app/download](https://cadwiz.app/download) and unzip it.
-2. Close FreeCAD and your assistant app.
+2. Close FreeCAD, and quit your assistant app fully: right-click its icon by the clock
+   and choose **Quit** (closing its window leaves it running, and it reads CADWiz's
+   settings only when it starts).
 3. Double-click **`install_windows.bat`**. If FreeCAD 1.1 isn't installed, it asks
    whether to open FreeCAD's download page. It never downloads anything by itself.
    It then copies CADWiz into FreeCAD and connects CADWiz to Claude Desktop and,

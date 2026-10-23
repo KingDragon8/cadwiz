@@ -71,8 +71,12 @@ CONNECTED = "Connected to Claude"
 CONNECTING = "Connecting…"
 CONNECTING_TODO = "Nothing to do: your assistant app checks in within 30 seconds."
 NOT_CONNECTED = "Not connected"
-NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or the ChatGPT app) -- that is all; this turns "
-                      "green by itself within 30 seconds. If it stays red, press Connect.")
+# The one founder action that fixes a red light with the app already open is quitting it
+# fully: an app that was running when CADWiz was installed never read its new settings
+# (ORDER-2026-10-23-02). So the red line says that, not only "press Connect".
+NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or the ChatGPT app); this turns green by itself "
+                      "within 30 seconds. Still red with the app open? Quit the app fully -- right-click its icon by the clock, "
+                      "then Quit -- and open it again.")
 #: How long after FreeCAD opens the light waits (amber) for the first check-in.
 CONNECTING_GRACE_S = 45.0
 NO_BRIDGE = "Not connected — CADWiz's plug-in did not start; close and reopen FreeCAD"
@@ -1571,13 +1575,23 @@ class _Panel:
 def style_sheet(text_px: int = TEXT_PX) -> str:
     """The panel's look; text size from Setup (18 px at the least, UI-LAYOUT-STANDARD)."""
     px = max(TEXT_PX, int(text_px))
+    # Every kind of widget names its own text colour (and inputs their own background):
+    # the panel is light whatever FreeCAD's theme is. Under "FreeCAD Dark" the theme's
+    # own rules for QLabel, QPushButton and friends otherwise win, and the panel drew
+    # white text on its white buttons (ORDER-2026-10-23-02, the founder's laptop).
     return f"""
 QWidget#CADWiz_Slim_Panel {{ background: #F4F5FD; color: {INK}; font-size: {px}px; font-family: Arial; }}
-QWidget#CADWiz_Slim_Panel QLabel {{ font-size: {px}px; }}
-QWidget#CADWiz_Slim_Panel QCheckBox {{ font-size: {px}px; }}
-QWidget#CADWiz_Slim_Panel QSpinBox, QWidget#CADWiz_Slim_Panel QDoubleSpinBox {{ font-size: {px}px; padding: 2px 4px; }}
+QWidget#CADWiz_Slim_Panel QLabel {{ font-size: {px}px; color: {INK}; }}
+QWidget#CADWiz_Slim_Panel QCheckBox, QWidget#CADWiz_Slim_Panel QRadioButton {{ font-size: {px}px; color: {INK}; }}
+QWidget#CADWiz_Slim_Panel QSpinBox, QWidget#CADWiz_Slim_Panel QDoubleSpinBox {{ font-size: {px}px; padding: 2px 4px;
+    color: {INK}; background: white; }}
+QWidget#CADWiz_Slim_Panel QScrollArea, QWidget#CADWiz_Slim_Panel QScrollArea > QWidget > QWidget {{ background: #F4F5FD; }}
+QWidget#CADWiz_Slim_Panel QAbstractItemView {{ color: {INK}; background: white; selection-background-color: {FOUNDER_BLUE};
+    selection-color: white; }}
+QWidget#CADWiz_Slim_Panel QTextEdit, QWidget#CADWiz_Slim_Panel QPlainTextEdit {{ color: {INK}; background: white; }}
+QWidget#CADWiz_Slim_Panel QToolButton {{ color: {INK}; }}
 QWidget#CADWiz_Slim_Panel QPushButton {{ font-size: {px}px; padding: 6px 12px; border: 1px solid #C7CBE8; border-radius: 6px;
-    background: white; min-height: 28px; }}
+    background: white; color: {INK}; min-height: 28px; }}
 QWidget#CADWiz_Slim_Panel QPushButton:hover {{ border-color: {FOUNDER_BLUE}; }}
 QWidget#CADWiz_Slim_Panel QPushButton:checked {{ background: {FOUNDER_BLUE}; color: white; border-color: {FOUNDER_BLUE}; }}
 QWidget#CADWiz_Slim_Panel QPushButton:disabled {{ color: #9AA0A6; }}
@@ -1591,7 +1605,8 @@ QFrame[role='section'] {{ background: white; border: 1px solid #C7CBE8; border-r
 QFrame[role='problem'] {{ background: #FFF8F6; border: 1px solid #F2B8B5; border-radius: 6px; }}
 QWidget#CADWiz_Slim_Panel QLabel[role='heading'] {{ font-weight: 700; border: none; }}
 QFrame[role='section'] QLabel, QFrame[role='problem'] QLabel {{ border: none; background: transparent; }}
-QWidget#CADWiz_Slim_Panel QLineEdit, QWidget#CADWiz_Slim_Panel QComboBox {{ font-size: {px}px; padding: 4px 6px; }}
+QWidget#CADWiz_Slim_Panel QLineEdit, QWidget#CADWiz_Slim_Panel QComboBox {{ font-size: {px}px; padding: 4px 6px;
+    color: {INK}; background: white; border: 1px solid #C7CBE8; border-radius: 4px; }}
 QFrame#CADWiz_Strip {{ background: #F4F5FD; }}
 """
 

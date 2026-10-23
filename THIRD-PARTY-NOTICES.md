@@ -16,7 +16,7 @@ includes, uses or runs alongside the following. Each keeps its own licence.
 
 | Component | Licence | How CADWiz uses it |
 |---|---|---|
-| FreeCAD 1.1.3 (with its Python, Qt/PySide6, OpenCascade, Pivy, NumPy) | LGPL-2.1+ (FreeCAD); see FreeCAD's own notices for the rest | CADWiz is a FreeCAD addon |
+| FreeCAD 1.1 (with its Python, Qt/PySide6, OpenCascade, Pivy, NumPy) | LGPL-2.1+ (FreeCAD); see FreeCAD's own notices for the rest | CADWiz is a FreeCAD addon |
 | `mcp` 1.27 (Model Context Protocol SDK) and its dependencies (pydantic, pydantic-settings, ...) | MIT | Installed into FreeCAD's Python; the connection to Claude Desktop |
 | Claude Desktop | Anthropic's terms | The AI app the user talks to; not part of CADWiz |
 
