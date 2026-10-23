@@ -1,7 +1,7 @@
 {
- "python_files": 187,
- "licence_headers_added": 164,
- "data_files": 16,
+ "python_files": 188,
+ "licence_headers_added": 165,
+ "data_files": 17,
  "files": [
   "CADWiz/src/ai_freecad_core/__init__.py",
   "CADWiz/src/ai_freecad_core/ai/__init__.py",
@@ -111,6 +111,7 @@
   "CADWiz/src/integrations/cadwiz_plugin/feedback.py",
   "CADWiz/src/integrations/cadwiz_plugin/fetch.py",
   "CADWiz/src/integrations/cadwiz_plugin/geometry_job.py",
+  "CADWiz/src/integrations/cadwiz_plugin/launch.py",
   "CADWiz/src/integrations/cadwiz_plugin/mesh_job.py",
   "CADWiz/src/integrations/cadwiz_plugin/mesh_tools.py",
   "CADWiz/src/integrations/cadwiz_plugin/panel_host.py",

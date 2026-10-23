@@ -74,7 +74,14 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
    whether to open FreeCAD's download page. It never downloads anything by itself.
    It then copies CADWiz into FreeCAD and connects CADWiz to Claude Desktop and,
    if you have it, the ChatGPT desktop app, saving a copy of each app's settings first.
-   It lists everything it changed.
+   It adds **CADWiz** to the Start menu (and, if you say yes, to your desktop), and it
+   lists everything it changed.
+4. Click **CADWiz**. It opens FreeCAD with the CADWiz panel, together with your
+   assistant app.
+
+**To remove CADWiz:** Start menu > CADWiz > **Uninstall CADWiz** (or double-click
+`uninstall_windows.bat`). It removes CADWiz, its shortcuts and its entry in your
+assistant app's settings, and keeps your models and their versions.
 
 **macOS / Linux (less tested):** unzip, then run `bash scripts/install.sh`.
 

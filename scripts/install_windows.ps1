@@ -14,7 +14,10 @@
   4. Connects the AI app you use: adds CADWiz to Claude Desktop's settings and, if
      the ChatGPT desktop app is set up, to its settings too -- after saving a
      copy of each.
-  5. Says exactly what it changed.
+  5. Adds CADWiz to the Start menu -- a CADWiz shortcut that opens FreeCAD and
+     your assistant app together, and Uninstall CADWiz -- and, if you say yes, a
+     CADWiz icon on the desktop.
+  6. Says exactly what it changed.
 
   Close FreeCAD and Claude Desktop first. Double-click install_windows.bat, or run:
     powershell -ExecutionPolicy Bypass -File scripts\install_windows.ps1
@@ -32,7 +35,11 @@ param(
     [string]$ClaudeConfig = (Join-Path $env:APPDATA "Claude\claude_desktop_config.json"),
     [string]$CodexConfig = (Join-Path $env:USERPROFILE ".codex\config.toml"),
     [string]$FreeCADBin = "",
+    [string]$StartMenuDir = (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\CADWiz"),
+    [string]$DesktopDir = [Environment]::GetFolderPath("Desktop"),
+    [string]$DataDir = (Join-Path $env:LOCALAPPDATA "CADWiz"),
     [switch]$Yes,
+    [switch]$NoDesktop,
     [switch]$NoPip
 )
 $ErrorActionPreference = "Stop"
@@ -53,7 +60,10 @@ if (-not (Test-Path -LiteralPath (Join-Path $Source "InitGui.py"))) { throw "The
 
 # ---- 1. FreeCAD 1.1 -------------------------------------------------------------------
 if (-not $FreeCADBin) {
-    $found = Get-ChildItem "C:\Program Files\FreeCAD 1.*\bin\freecad.exe" -ErrorAction SilentlyContinue |
+    # FreeCAD installs for everyone (Program Files) or "just for me" (the user's own
+    # Programs folder); look in both.
+    $found = @("$env:ProgramFiles\FreeCAD 1.*\bin\freecad.exe", "$env:LOCALAPPDATA\Programs\FreeCAD 1.*\bin\freecad.exe") |
+        ForEach-Object { Get-ChildItem $_ -ErrorAction SilentlyContinue } |
         Sort-Object FullName -Descending | Select-Object -First 1
     if ($found) { $FreeCADBin = Split-Path -Parent $found.FullName }
 }
@@ -138,11 +148,52 @@ if (Test-Path -LiteralPath $CodexConfig) {
     $Changed.Add("The ChatGPT desktop app is not set up on this computer, so only Claude was connected. Install it and run this again to use ChatGPT.")
 }
 
+# ---- 4c. the CADWiz shortcut, and how to uninstall -----------------------------------------
+# One click on CADWiz opens FreeCAD and the assistant chosen in the panel together. It runs
+# through FreeCAD's own windowless Python, so no console window flashes.
+$Pythonw = Join-Path $FreeCADBin "pythonw.exe"
+$Launch = Join-Path $AddonPath "src\integrations\cadwiz_plugin\launch.py"
+$Icon = Join-Path $AddonPath "Resources\icons\cadwiz.ico"
+$Shell = New-Object -ComObject WScript.Shell
+function New-Shortcut([string]$Path, [string]$Target, [string]$Arguments, [string]$Description) {
+    $link = $Shell.CreateShortcut($Path)
+    $link.TargetPath = $Target
+    $link.Arguments = $Arguments
+    $link.WorkingDirectory = $FreeCADBin
+    $link.Description = $Description
+    if (Test-Path -LiteralPath $Icon) { $link.IconLocation = "$Icon,0" }
+    $link.Save()
+}
+New-Item -ItemType Directory -Path $StartMenuDir, $DataDir -Force | Out-Null
+$Uninstaller = Join-Path $DataDir "uninstall_windows.ps1"
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "uninstall_windows.ps1") -Destination $Uninstaller -Force
+$Shortcuts = New-Object System.Collections.Generic.List[string]
+$startLink = Join-Path $StartMenuDir "CADWiz.lnk"
+New-Shortcut $startLink $Pythonw "`"$Launch`"" "Open FreeCAD with CADWiz, and your assistant app"
+$Shortcuts.Add($startLink)
+$uninstallLink = Join-Path $StartMenuDir "Uninstall CADWiz.lnk"
+New-Shortcut $uninstallLink "powershell.exe" "-NoProfile -ExecutionPolicy Bypass -File `"$Uninstaller`"" "Remove CADWiz from this computer"
+$Shortcuts.Add($uninstallLink)
+$Changed.Add("Added CADWiz to the Start menu (CADWiz, and Uninstall CADWiz)")
+if (-not $NoDesktop -and (Ask "Add a CADWiz icon to your desktop? It opens FreeCAD and your assistant app together.")) {
+    $deskLink = Join-Path $DesktopDir "CADWiz.lnk"
+    New-Shortcut $deskLink $Pythonw "`"$Launch`"" "Open FreeCAD with CADWiz, and your assistant app"
+    $Shortcuts.Add($deskLink)
+    $Changed.Add("Added a CADWiz icon to your desktop")
+}
+# What the uninstaller undoes -- exactly this, nothing else.
+$record = [PSCustomObject]@{
+    installed = (Get-Date).ToString("s"); addon = $(if ($SourceOnly) { "" } else { $AddonPath })
+    claude_config = $ClaudeConfig; codex_config = $CodexConfig; shortcuts = @($Shortcuts); start_menu = $StartMenuDir
+}
+[IO.File]::WriteAllText((Join-Path $DataDir "install.json"), ($record | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding $false))
+
 # ---- 5. what changed ----------------------------------------------------------------------
 Write-Host ""
 Write-Host "Done. What this installer changed:" -ForegroundColor Green
 $Changed | ForEach-Object { Write-Host "  - $_" }
 Write-Host ""
-Write-Host "Next: open FreeCAD (the CADWiz panel appears on the right), then open Claude Desktop or the ChatGPT app."
+Write-Host "Next: click CADWiz in the Start menu (or on your desktop). It opens FreeCAD with the CADWiz panel, and your assistant app."
 Write-Host "The light at the top of the panel turns green within a minute. Choose Claude or ChatGPT at the top of the panel."
+Write-Host "To remove CADWiz later: Start menu > CADWiz > Uninstall CADWiz."
 exit 0
