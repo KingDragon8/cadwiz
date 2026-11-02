@@ -68,3 +68,11 @@ stand-in that fails if touched). The module refuses any host but
 https://cadwiz.app. It runs in the plug-in's server process, never on FreeCAD's
 window thread, and nothing is ever reported in the background.
 """
+[[allowed]]
+path = "CADWiz/src/integrations/cadwiz_plugin/connection_control.py"
+purpose = "User-initiated reconnect of the selected local MCP connector"
+sends = "An empty reconnect request and a local authentication token; no model, account, or conversation data"
+receives = "Whether the real connector successfully checked in with FreeCAD"
+hosts = ["127.0.0.1"]
+user_initiated = true
+justification = "The Connect button requests a fresh authenticated heartbeat from the running MCP connector. Both control and bridge endpoints bind only to loopback."

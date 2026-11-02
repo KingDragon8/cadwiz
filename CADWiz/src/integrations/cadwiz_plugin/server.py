@@ -14,6 +14,7 @@ and pictures. Every tool's work is done -- and every rule enforced -- in FreeCAD
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import time
@@ -57,6 +58,11 @@ def client_name(ancestors: list[str] | None = None) -> str:
     (ORDER-2026-10-19-02): the panel turns "ChatGPT connected" green only on
     this. Anything not recognised as ChatGPT's is Claude Desktop, as before."""
     if ancestors is None:
+        explicit = os.environ.get("CADWIZ_CLIENT_APP", "").strip().lower()
+        if explicit in ("chatgpt", "codex"):
+            return "ChatGPT (Codex app)"
+        if explicit == "claude":
+            return "Claude Desktop"
         if not _client:
             from ai_freecad_core.ai.spend_guard import _process_names_of_ancestors
 
@@ -321,6 +327,15 @@ def build_server() -> Any:
 
 
 def main() -> None:
+    from integrations.cadwiz_plugin.connection_control import start
+
+    def reconnect() -> bool:
+        info = _bridge()
+        if not info:
+            return False
+        return bool(_send(info, "hello", {"client": client_name(), "working_here": True}, timeout=5).get("ok"))
+
+    start("chatgpt" if "chatgpt" in client_name().lower() else "claude", reconnect)
     threading.Thread(target=_heartbeat, name="cadwiz-heartbeat", daemon=True).start()
     build_server().run()
 

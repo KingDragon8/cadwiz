@@ -10,6 +10,13 @@ Windows and the clock are stand-ins; nothing here opens an app.
 from __future__ import annotations
 
 from integrations.cadwiz_plugin import connect_claude
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def isolated_reconnect(monkeypatch):
+    from integrations.cadwiz_plugin import connection_control
+    monkeypatch.setattr(connection_control, "reconnect", lambda app: False)
 
 
 class _Clock:

@@ -75,9 +75,14 @@ CODEX_CONFIG="${CODEX_CONFIG:-$HOME/.codex/config.toml}"
 if [ -f "$CODEX_CONFIG" ]; then
   if grep -q '^\[mcp_servers\.cadwiz\]' "$CODEX_CONFIG"; then
     CHANGED+=("The ChatGPT app already had CADWiz in its settings; left as it was")
+    if ! grep -q 'CADWIZ_CLIENT_APP\|^\[mcp_servers\.cadwiz\.env\]\|^[[:space:]]*env[[:space:]]*=' "$CODEX_CONFIG"; then
+      cp "$CODEX_CONFIG" "$CODEX_CONFIG.before-cadwiz-$STAMP"
+      printf "\n[mcp_servers.cadwiz.env]\nCADWIZ_CLIENT_APP = 'chatgpt'\n" >> "$CODEX_CONFIG"
+      CHANGED+=("Identified the existing CADWiz connector as ChatGPT, after saving its settings")
+    fi
   else
     cp "$CODEX_CONFIG" "$CODEX_CONFIG.before-cadwiz-$STAMP"
-    printf "\n[mcp_servers.cadwiz]\ncommand = '%s'\nargs = ['%s']\nstartup_timeout_sec = 60\n" \
+    printf "\n[mcp_servers.cadwiz]\ncommand = '%s'\nargs = ['%s']\nstartup_timeout_sec = 60\n[mcp_servers.cadwiz.env]\nCADWIZ_CLIENT_APP = 'chatgpt'\n" \
       "$FREECAD_PY" "$ADDON/src/integrations/cadwiz_plugin/server.py" >> "$CODEX_CONFIG"
     CHANGED+=("Added CADWiz to the ChatGPT app's settings ($CODEX_CONFIG), after saving a copy")
   fi

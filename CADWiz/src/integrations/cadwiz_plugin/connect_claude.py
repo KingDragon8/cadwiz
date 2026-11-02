@@ -104,6 +104,12 @@ class Connector:
 
     def _work(self) -> None:
         candidates = list(APPS) if self.choice == "auto" else [self.app]
+        from integrations.cadwiz_plugin.connection_control import reconnect
+
+        for app in candidates:
+            if reconnect(app):
+                self.app, self.stage = app, "waiting"
+                return
         found = {app: self._look(app) for app in candidates}
         running = [app for app in candidates if found[app].get("running")]
         if running:

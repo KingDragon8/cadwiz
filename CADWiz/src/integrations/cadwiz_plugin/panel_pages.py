@@ -117,6 +117,8 @@ class AiChoice:
         panel = self.panel
         lights = ai_lights(panel.bridge(), panel.prefs.ai_app)
         first = lights[0]
+        if getattr(panel, "connector", None) is not None:
+            first = panel.light_now()
         panel.light.setText(f"● {first['line']}")
         panel.light.setStyleSheet(f"color: {first['light']}; font-weight: 700;")
         panel.todo.setText(first["todo"])

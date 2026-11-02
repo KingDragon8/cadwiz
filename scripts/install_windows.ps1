@@ -163,10 +163,16 @@ if (Test-Path -LiteralPath $CodexConfig) {
     $codexText = Get-Content -Raw -LiteralPath $CodexConfig
     if ($codexText -match '(?m)^\[mcp_servers\.cadwiz\]') {
         $Changed.Add("The ChatGPT app already had CADWiz in its settings ($CodexConfig); left as it was")
+        $cadwizSection = [regex]::Match($codexText, '(?ms)^\[mcp_servers\.cadwiz\]\s*\n(.*?)(?=^\[|\z)').Groups[1].Value
+        if ($codexText -notmatch 'CADWIZ_CLIENT_APP' -and $codexText -notmatch '(?m)^\[mcp_servers\.cadwiz\.env\]' -and $cadwizSection -notmatch '(?m)^\s*env\s*=') {
+            Copy-Item -LiteralPath $CodexConfig -Destination "$CodexConfig.before-cadwiz-$Stamp"
+            [IO.File]::AppendAllText($CodexConfig, "`n[mcp_servers.cadwiz.env]`nCADWIZ_CLIENT_APP = 'chatgpt'`n", (New-Object Text.UTF8Encoding $false))
+            $Changed.Add("Identified the existing CADWiz connector as ChatGPT, after saving its settings")
+        }
     } else {
         $savedCodex = "$CodexConfig.before-cadwiz-$Stamp"
         Copy-Item -LiteralPath $CodexConfig -Destination $savedCodex
-        $block = "`n[mcp_servers.cadwiz]`ncommand = '$FreeCADPython'`nargs = ['$server']`nstartup_timeout_sec = 60`n"
+        $block = "`n[mcp_servers.cadwiz]`ncommand = '$FreeCADPython'`nargs = ['$server']`nstartup_timeout_sec = 60`n[mcp_servers.cadwiz.env]`nCADWIZ_CLIENT_APP = 'chatgpt'`n"
         [IO.File]::AppendAllText($CodexConfig, $block, (New-Object Text.UTF8Encoding $false))
         $Changed.Add("Saved a copy of the ChatGPT app's settings as $savedCodex")
         $Changed.Add("Added CADWiz to the ChatGPT app's settings ($CodexConfig)")

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.0-beta.4: reconnect the selected assistant
+
+- Connect asks the running CADWiz connector to re-establish its authenticated local FreeCAD connection.
+- The button waits for the selected assistant's heartbeat; Claude's connection cannot satisfy ChatGPT's status.
+- Reconnect progress remains visible instead of being overwritten by the red status label.
+- The installer explicitly identifies the ChatGPT connector, including upgrades with existing settings. Existing settings are backed up.
+- Reconnection uses a token-protected loopback endpoint. It never closes the assistant or invents a successful heartbeat.
+- Existing open applications need one restart after installing this update.
+
 ## v0.5.0-beta.3: fixes from the first tester install
 
 - **Readable under FreeCAD's dark theme.** With "FreeCAD Dark" chosen, the panel

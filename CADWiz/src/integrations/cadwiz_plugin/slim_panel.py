@@ -1030,7 +1030,9 @@ class _Panel:
         light = connection(bridge, time.monotonic() - self.opened_at)
         connector = getattr(self, "connector", None)
         if connector is not None and bridge is not None:
-            stage = connector.poll(bool(bridge.connected))
+            connected = (bridge.connected_to(connector.app) if hasattr(bridge, "connected_to")
+                         else bool(bridge.connected))
+            stage = connector.poll(connected)
             if stage == "connected":
                 self.connector = None
             elif connector.busy:
