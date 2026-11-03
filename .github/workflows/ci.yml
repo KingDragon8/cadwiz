@@ -4,7 +4,7 @@ name: checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "release/**"]
 
 permissions:
   contents: read
@@ -44,6 +44,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Claude extension
+        run: npx --yes @anthropic-ai/mcpb@2.1.2 validate CADWiz/Resources/claude-extension/manifest.json
+      - name: Verify bundled helper offline in a private folder
+        env:
+          CADWIZ_SETUP_DIR: ${{ runner.temp }}/cadwiz-offline-proof
+        run: python CADWiz/src/integrations/cadwiz_plugin/offline_launcher.py --check
       - run: python -m pip install pytest "mcp==1.27.0" pillow ruff
       - name: Lint (real mistakes only)
         run: python -m ruff check CADWiz/src scripts tests
@@ -64,8 +73,10 @@ jobs:
           curl -sSfL -o FreeCAD.AppImage https://github.com/FreeCAD/FreeCAD/releases/download/1.1.4/FreeCAD_1.1.4-Linux-x86_64-py311.AppImage
           chmod +x FreeCAD.AppImage
           ./FreeCAD.AppImage --appimage-extract > /dev/null
-      - name: Install the connector's one package into FreeCAD's Python
-        run: squashfs-root/usr/bin/python -m pip install --user "mcp==1.27.0"
+      - name: Verify the offline helper with FreeCAD's Python
+        env:
+          CADWIZ_SETUP_DIR: ${{ runner.temp }}/cadwiz-freecad-proof
+        run: squashfs-root/usr/bin/python CADWiz/src/integrations/cadwiz_plugin/offline_launcher.py --check
       - name: Load check
         # The result file is shown whether the check passes or fails.
         run: |

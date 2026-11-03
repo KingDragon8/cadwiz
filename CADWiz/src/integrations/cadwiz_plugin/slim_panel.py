@@ -688,10 +688,25 @@ class _Panel:
         self.connect_button.clicked.connect(self.connect_claude)
         self.connect_button.hide()
         self.connector = None
-        self.ai_choice.row.insertWidget(1, self.connect_button)
+        self.undo_connection_button = QtWidgets.QPushButton("Undo connection", header)
+        self.undo_connection_button.clicked.connect(self.undo_connection)
+        self.manual_connection_button = QtWidgets.QPushButton("Manual connection", header)
+        self.manual_connection_button.clicked.connect(self.manual_connection)
         info.addLayout(self.ai_choice.row)
         for widget in (self.todo, self.working):
             info.addWidget(widget)
+        self.setup_status_label = QtWidgets.QLabel("Checking the local connection setup…", header)
+        self.setup_status_label.setWordWrap(True)
+        info.addWidget(self.setup_status_label)
+        setup_actions = QtWidgets.QHBoxLayout()
+        setup_actions.addWidget(self.connect_button)
+        setup_actions.addWidget(self.undo_connection_button)
+        setup_actions.addWidget(self.manual_connection_button)
+        help_button = QtWidgets.QPushButton("Get help", header)
+        help_button.clicked.connect(self.connection_help)
+        setup_actions.addWidget(help_button)
+        setup_actions.addStretch(1)
+        info.addLayout(setup_actions)
         row.addLayout(info, 1)
         return header
 
@@ -1042,13 +1057,30 @@ class _Panel:
         with contextlib.suppress(Exception):
             self.connect_button.setVisible(light["light"] != GREEN)
             self.connect_button.setEnabled(not (connector is not None and connector.busy))
+            selected = str(getattr(self.prefs, "ai_app", "auto"))
+            self.connect_button.setText("Add to Claude" if selected == "claude" else "Connect ChatGPT / Codex" if selected == "chatgpt" else "Connect assistant")
+            self.connect_button.setFixedWidth(snug_width(self.QtGui.QFontMetrics(self.connect_button.font()).horizontalAdvance(self.connect_button.text())))
+            from integrations.cadwiz_plugin import setup_startup, install_setup
+            self.setup_status_label.setText(setup_startup.status["message"])
+            self.undo_connection_button.setVisible(any((install_setup.data_dir() / n).exists() for n in ("codex-undo.json", "duplicate-undo.json", "claude-undo.json")))
+            self.manual_connection_button.setVisible(selected != "claude")
         return light
 
     def connect_claude(self) -> None:
-        from integrations.cadwiz_plugin.connect_claude import Connector
-
-        self.connector = Connector(app=str(getattr(self.prefs, "ai_app", "claude")))
+        from integrations.cadwiz_plugin.setup_panel import connect
+        connect(self)
         self.refresh()
+
+    def undo_connection(self) -> None:
+        from integrations.cadwiz_plugin.setup_panel import undo
+        undo(self)
+
+    def manual_connection(self) -> None:
+        from integrations.cadwiz_plugin.setup_panel import values
+        values(self)
+
+    def connection_help(self) -> None:
+        self.QtGui.QDesktopServices.openUrl(self.QtCore.QUrl("https://cadwiz.app/feedback"))
 
     def save_preferences(self) -> None:
         from integrations.cadwiz_plugin import preferences_store
@@ -1270,14 +1302,43 @@ class _Panel:
         if kind == "lasso" and len(points) > 60:
             step = len(points) / 60.0
             points = [points[int(i * step)] for i in range(60)]
-        size = self.canvas.picture_rect()
-        anchors = [view_link.pick(view, camera, u, v, self.picture_aspect, picture_px=(size.width(), size.height())) for u, v in points]
-        try:
-            self.book().add(kind, anchors, author=VisualMarkAuthor.USER, text=text)
-        except ValueError:
-            return
-        self.wiz_player.activity()
+        from integrations.cadwiz_plugin.annotation_job import Job, snapshot
+        previous = getattr(self, "_annotation_job", None)
+        if previous is not None:
+            previous.cancelled.set()
+        document = self.document()
+        signature = self.picture_signature
+        self.canvas.pending_preview = (kind, list(points))
         self.canvas.update()
+        def begin():
+            # The preview has already had an event-loop turn to paint.
+            if self.document() is not document or self.picture_camera != camera:
+                self.canvas.pending_preview = None
+                return
+            size = self.canvas.picture_rect()
+            job = Job(camera, points, self.picture_aspect, (size.width(), size.height()), snapshot())
+            self._annotation_job = job
+            def finish():
+                if self._annotation_job is not job or job.cancelled.is_set():
+                    return
+                result = job.poll()
+                if result is None:
+                    self.QtCore.QTimer.singleShot(30, finish)
+                    return
+                anchors, elapsed, error = result
+                self.canvas.pending_preview = None
+                self._annotation_job = None
+                if self.document() is document and self.picture_camera == camera and self.picture_signature == signature:
+                    if not error:
+                        with contextlib.suppress(ValueError):
+                            self.book().add(kind, anchors, author=VisualMarkAuthor.USER, text=text)
+                        self.wiz_player.activity()
+                    else:
+                        self.flash("The mark could not be anchored. Please try again.", FOUNDER_BLUE)
+                self.annotation_timing = {"pick_seconds": round(elapsed, 3), "points": len(points)}
+                self.canvas.update()
+            finish()
+        self.QtCore.QTimer.singleShot(25, begin)
 
     def highlight_face(self, point: tuple[float, float]) -> None:
         """Highlight by a click: paint the whole face under it, by its own outline,
@@ -1320,11 +1381,20 @@ class _Panel:
                 view.zoomIn() if steps > 0 else view.zoomOut()
 
     def undo_mark(self) -> None:
+        self.cancel_pending_mark()
         self.book().undo(VisualMarkAuthor.USER)
         self.canvas.update()
 
     def clear_marks(self) -> None:
+        self.cancel_pending_mark()
         self.book().clear()
+
+    def cancel_pending_mark(self) -> None:
+        job = getattr(self, "_annotation_job", None)
+        if job is not None:
+            job.cancelled.set()
+        self._annotation_job = None
+        self.canvas.pending_preview = None
         self.canvas.update()
 
     def marks(self) -> list[AnchoredMark]:
@@ -1853,21 +1923,25 @@ def _make_canvas(QtCore: Any, QtGui: Any, QtWidgets: Any) -> Any:
             self._label(painter, QtCore.QPointF(10, self.height() - 40), legend, FOUNDER_BLUE)
 
         def _paint_drag(self, painter: Any) -> None:
-            if not self.drag or not self.tool:
+            pending = getattr(self, "pending_preview", None)
+            tool, drag = pending if pending else (self.tool, self.drag)
+            if not drag or not tool:
                 return
             rect = self.picture_rect()
-            pts = [QtCore.QPointF(rect.left() + u * rect.width(), rect.top() + v * rect.height()) for u, v in self.drag]
+            pts = [QtCore.QPointF(rect.left() + u * rect.width(), rect.top() + v * rect.height()) for u, v in drag]
             pen = QtGui.QPen(QtGui.QColor(FOUNDER_BLUE), 2, QtCore.Qt.DashLine)
             painter.setPen(pen)
             painter.setBrush(QtCore.Qt.NoBrush)
-            if self.tool == "lasso":
+            if len(pts) == 1:
+                painter.drawEllipse(pts[0], 5, 5)
+            elif tool == "lasso":
                 painter.drawPolyline(QtGui.QPolygonF(pts))
             elif len(pts) == 2:
-                if self.tool == "circle":
+                if tool == "circle":
                     dx, dy = pts[1].x() - pts[0].x(), pts[1].y() - pts[0].y()
                     radius = (dx * dx + dy * dy) ** 0.5
                     painter.drawEllipse(pts[0], radius, radius)
-                elif self.tool in ("box", "highlight"):
+                elif tool in ("box", "highlight"):
                     painter.drawRect(QtCore.QRectF(pts[0], pts[1]).normalized())
                 else:
                     painter.drawLine(pts[0], pts[1])

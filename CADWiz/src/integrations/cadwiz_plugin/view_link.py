@@ -1,5 +1,3 @@
-# SPDX-License-Identifier: LGPL-2.1-or-later
-# Copyright (C) 2026 Steve Gregerson / WizLabs
 """The founder's FreeCAD 3D view, as the CADWiz panel and the Claude plug-in use it
 (ORDER-2026-10-18-01).
 
@@ -281,7 +279,7 @@ def same_camera(a: Camera, b: Camera, tolerance: float = 1e-4) -> bool:
     return all(abs(x - y) <= tolerance * scale for x, y in zip(numbers_a, numbers_b))
 
 
-def ray_hit(camera: Camera, u: float, v: float, aspect: float) -> ModelAnchor | None:
+def ray_hit(camera: Camera, u: float, v: float, aspect: float, objects: list[Any] | None = None) -> ModelAnchor | None:
     """The first visible surface along the picture's line of sight: solids (the
     face it crosses) and meshes (the facet it crosses). None when it misses."""
     try:
@@ -294,11 +292,12 @@ def ray_hit(camera: Camera, u: float, v: float, aspect: float) -> ModelAnchor | 
     end = FreeCAD.Vector(*[origin[i] + direction[i] * 1e4 for i in range(3)])
     line = Part.LineSegment(start, end).toShape()
     best: tuple[float, ModelAnchor] | None = None
+    solid_hit: tuple[Any, Any, Any] | None = None
 
     def depth(point: Any) -> float:
         return sum((float(point[i]) - origin[i]) * direction[i] for i in range(3))
 
-    for obj in _visible_objects():
+    for obj in (_visible_objects() if objects is None else objects):
         with contextlib.suppress(Exception):
             if str(getattr(obj, "TypeId", "")) == "Mesh::Feature":
                 mesh = obj.Mesh.copy()
@@ -307,6 +306,7 @@ def ray_hit(camera: Camera, u: float, v: float, aspect: float) -> ModelAnchor | 
                     anchor = ModelAnchor((float(point[0]), float(point[1]), float(point[2])), str(obj.Name), f"Facet{facet + 1}", True)
                     if best is None or depth(point) < best[0]:
                         best = (depth(point), anchor)
+                        solid_hit = None
                 continue
             shape = obj.Shape
             if shape.isNull() or not shape.Solids:
@@ -315,8 +315,17 @@ def ray_hit(camera: Camera, u: float, v: float, aspect: float) -> ModelAnchor | 
                 point = vertex.Point
                 if best is not None and depth(point) >= best[0]:
                     continue
-                face = min(range(len(shape.Faces)), key=lambda i: shape.Faces[i].distToShape(vertex)[0])
-                best = (depth(point), ModelAnchor((point.x, point.y, point.z), str(obj.Name), f"Face{face + 1}", True))
+                # Do not search every face of every provisional hit. Only the
+                # closest final hit needs a face name; retrieving Shape.Faces
+                # inside the distance key also rebuilt the entire list per face.
+                best = (depth(point), ModelAnchor((point.x, point.y, point.z), str(obj.Name), "", True))
+                solid_hit = (obj, shape, vertex)
+    if solid_hit is not None:
+        obj, shape, vertex = solid_hit
+        faces = shape.Faces
+        face = min(range(len(faces)), key=lambda i: faces[i].distToShape(vertex)[0])
+        point = vertex.Point
+        return ModelAnchor((point.x, point.y, point.z), str(obj.Name), f"Face{face + 1}", True)
     return best[1] if best else None
 
 

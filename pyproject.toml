@@ -1,6 +1,6 @@
 [project]
 name = "cadwiz"
-version = "0.5.0b4"
+version = "0.6.0"
 description = "CADWiz: a FreeCAD addon that lets Claude Desktop see, measure, build and edit your models"
 license = "LGPL-2.1-or-later"
 requires-python = ">=3.11"
