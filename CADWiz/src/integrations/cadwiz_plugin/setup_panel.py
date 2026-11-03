@@ -31,6 +31,8 @@ def connect(panel) -> None:
                 if migrated:
                     setup.undo_claude()
                 raise ValueError("CW-SETUP-OPEN: Open Claude Desktop, Settings, Extensions, and install " + str(bundle))
+            if migrated:
+                qt.QMessageBox.information(panel.content, "Finish the Claude upgrade", "After pressing Install in Claude, fully quit and reopen Claude to stop its old connector process. Your old CADWiz entry is backed up and Undo is available.")
         else:
             values = setup.server_values(info)
             # Retain beta.4's authenticated reconnect for an already-correct entry.
