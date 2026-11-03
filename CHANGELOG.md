@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.6.0 — desktop setup and faster communication screen
+
+- Bundled offline Python 3.11 helpers for Windows x64, Mac Apple Silicon/Intel and Linux x64.
+- Claude desktop extension with a small Node launcher; existing Python connector retained.
+- Explicit OpenAI setup preview, scoped backup/undo, copyable settings and owned-entry repair.
+- Offline background startup check and preserved duplicate add-on copies.
+- Immediate mark preview and cancellable picking on geometry copies; nearest-hit face lookup optimized.
+- Render provenance and explicit already-open file behavior.
+- Workshop preferences can be saved through the assistant.
+- Mac physical installation remains unverified; no claim of material or manufacturing certification.
+
+
 ## v0.5.0-beta.4: reconnect the selected assistant
 
 - Connect asks the running CADWiz connector to re-establish its authenticated local FreeCAD connection.

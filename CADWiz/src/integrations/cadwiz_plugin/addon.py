@@ -139,6 +139,9 @@ def register() -> Any:
 
     _workbench = CADWizWorkbench()
     gui.addWorkbench(_workbench)
+    # Runtime discovery and private helper verification never delay the window.
+    from integrations.cadwiz_plugin.setup_startup import start as check_setup
+    check_setup(import_module("FreeCAD"))
     start_bridge()
     _schedule_panel_at_startup()
     return _workbench

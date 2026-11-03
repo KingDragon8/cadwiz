@@ -43,7 +43,7 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 
 ## Status
 
-**v0.5.0-beta.3, early release.**
+**v0.6.0.**
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;
@@ -65,6 +65,16 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
 - **Windows 10 or 11** is the most tested. **macOS and Linux:** help wanted.
 
 ## Install
+
+1. Follow the illustrated guide at [cadwiz.app/download](https://cadwiz.app/download).
+2. Install CADWiz through FreeCAD Addon Manager using its custom repository source, then restart FreeCAD.
+3. Choose **Add to Claude** or **Connect ChatGPT / Codex** in CADWiz; ask your desktop assistant what's open in FreeCAD.
+
+Windows is checked in isolation. Mac helper bundles are included but real-device installation is unverified. Offline helpers target FreeCAD Python 3.11. No paid service is called by installation tests.
+
+<details><summary>Advanced: install by hand (legacy fallback)</summary>
+
+### Manual installation
 
 **Windows (recommended):**
 1. Download the latest `cadwiz-<version>.zip` from
@@ -110,6 +120,8 @@ For the ChatGPT desktop app, it's `%USERPROFILE%\.codex\config.toml`:
 command = 'C:\Program Files\FreeCAD 1.1\bin\python.exe'
 args = ['C:\Users\<you>\AppData\Roaming\FreeCAD\v1-1\Mod\CADWiz\src\integrations\cadwiz_plugin\server.py']
 ```
+
+</details>
 
 ## First use
 

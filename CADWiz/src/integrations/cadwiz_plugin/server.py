@@ -44,6 +44,8 @@ INSTRUCTIONS = """CADWiz gives you hands and eyes in the user's FreeCAD on this 
 - A body lofted through rings (inspect says so, e.g. a helmet shell) is resized by its rings: `edit_object` with `inner_bottom_circumference_mm` keeps the wall and bladder thickness, the height and the top.
 - For concepts, search the web for real examples and show their sources and licences; the user's own picture always wins.
 - If a tool result has `say_to_founder`, that is the plain sentence to say to the user; `detail_for_claude` is for you only (fix your code with it) -- never show them raw errors, tracebacks or parameter lists.
+- Before a print handoff, report the actual CAD document/version, units, dimensions and parts. Compare the slicer's loaded scene and printer profile to the export manifest. An unsliced project is not printable G-code. Re-export after geometry changes.
+- For moving mechanisms, check the full intended motion against every surrounding part, including covers, lift tabs and fixed supports. Check travel limits and removal paths. Distinguish sampled positions from a continuous sweep, and CAD clearance from physical strength, friction and fatigue tests.
 - Export or print only when the user asks."""
 
 TIMEOUT_S = 900.0
@@ -293,9 +295,9 @@ def build_server() -> Any:
                                           "drop_bits_under_faces": drop_bits_under_faces}))
 
     @server.tool(structured_output=False)
-    def user_preferences() -> list[Any]:
+    def user_preferences(updates: dict[str, Any] | None = None) -> list[Any]:
         """How the user wants you to work, as they set it on CADWiz's Setup page: explanations (just do it / short and plain / teach me), questions before building (a few with defaults / none), before big changes (ask first / go ahead), their printers, nozzle, material and quality, licences they accept, model sites, inches or mm first. Read it at the start and follow it."""
-        return reply(call("user_preferences", {}))
+        return reply(call("user_preferences", {"updates": updates} if updates else {}))
 
     @server.tool(structured_output=False)
     def problems(document: str | None = None) -> list[Any]:

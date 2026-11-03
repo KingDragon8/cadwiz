@@ -336,6 +336,7 @@ class PluginSession:
         editability = (facts.get("editability") or {})
         construction = adoption.get("construction") or {}
         return {"open_documents": open_list, "document": target.Label, "objects": tree,
+                "script_execution": "Headless geometry worker. FreeCADGui window/view APIs are unavailable in edit scripts; use render for pictures and the native panel for views.",
                 "how_it_was_built": construction.get("plain") or construction.get("kind") or "",
                 "editability": {"level": editability.get("level"), "evidence": editability.get("evidence")},
                 "measurements": executor.measure([]).get("summary", ""), "bottom_opening": adoption.get("bottom_opening"),
@@ -363,7 +364,12 @@ class PluginSession:
             view = self._capture_view(str(self.project.folder / "renders" / f"current_view_{int(time.time())}.png"))
             if view:
                 images.insert(0, view)
-        return {"images": images, "captions": ["the user's current 3D view"] * (1 if current_view and images else 0)}
+        labels = ["CAD geometry render: " + str(v) for v in list(views or ["iso"])]
+        if current_view and view:
+            labels.insert(0, "Live FreeCAD viewport (may differ from geometry render)")
+        return {"images": images, "captions": labels[:len(images)], "document": target.Name,
+                "file": str(getattr(target, "FileName", "")), "version": executor.store.latest(),
+                "presentation_note": "Use the geometry render to verify the requested document; an empty live viewport is not proof of success."}
 
     def _build_model(self, code: str, document: str | None = None, note: str = "", new_document: str | None = None) -> dict[str, Any]:
         if not code.strip():
@@ -461,9 +467,41 @@ class PluginSession:
         return executor.check_print(printer)
 
     def _export(self, format: str, document: str | None = None) -> dict[str, Any]:  # noqa: A002
-        executor = self._executor(self._document(document))
+        target = self._document(document)
+        executor = self._executor(target)
         executor.export_allowed = True            # Claude asked for the file on the founder's behalf
-        return executor.export(format)
+        # Export the current live geometry, including edits made by hand since
+        # the last assistant version. An immutable snapshot prevents stale prints.
+        executor.store.backup(lambda dest: self._snapshot(target.Name, self._file_of(target), dest),
+                              note="current model captured for export")
+        result = executor.export(format)
+        if result.get("ok", True):
+            import hashlib
+            current = executor.store.current()
+            source = Path(str(current.file if current else getattr(target, "FileName", "") or ""))
+            source_hash = hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else None
+            parts = []
+            for obj in getattr(target, "Objects", []):
+                shape = getattr(obj, "Shape", None)
+                visible = getattr(getattr(obj, "ViewObject", None), "Visibility", getattr(obj, "Visibility", False))
+                if shape is None or not visible:
+                    continue
+                with contextlib.suppress(Exception):
+                    bound = shape.BoundBox
+                    parts.append({"name": obj.Name, "label": obj.Label,
+                                  "dimensions_mm": [bound.XLength, bound.YLength, bound.ZLength],
+                                  "geometry_sha256": hashlib.sha256(shape.exportBrepToString().encode()).hexdigest()})
+            manifest = {"document": target.Name, "source_file": str(source), "saved_source_sha256": source_hash,
+                        "version": executor.store.latest(), "units": "mm", "format": format, "parts": parts,
+                        "export_result": dict(result), "slicer_scene_verified": False,
+                        "note": "Compare dimensions and parts in your slicer. Re-export after model changes. This export uses the captured live-model version, including unsaved edits."}
+            folder = self.project.folder / "exports"
+            folder.mkdir(parents=True, exist_ok=True)
+            path = folder / ("export-manifest-" + str(time.time_ns()) + ".json")
+            path.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+            result["source_manifest"] = str(path)
+            result["slicer_scene_verified"] = False
+        return result
 
     def _open_document(self, path: str) -> dict[str, Any]:
         allowed = cad_folders([str(self.project.folder)] + [str(Path(str(getattr(d, "FileName", "") or ".")).parent)
@@ -472,6 +510,12 @@ class PluginSession:
             raise PlainError("That file is outside your CAD folders, so I won't open it. Add its folder to CADWiz's CAD folders first.")
         if not Path(path).is_file():
             raise PlainError("I can't find that file.")
+        for existing in dict(self.app.listDocuments()).values():
+            current = str(getattr(existing, "FileName", "") or "")
+            if current and Path(current).resolve() == Path(path).resolve():
+                return {"document": existing.Label, "file": str(path), "already_open": True,
+                        "reload_required": True,
+                        "say_to_founder": "This file is already open. The live document has been kept; it was not reloaded from disk. Save a checkpoint before closing and reopening it to load an external change."}
         document = self.app.openDocument(str(path))
         with contextlib.suppress(Exception):
             self.app.setActiveDocument(document.Name)
@@ -563,11 +607,21 @@ class PluginSession:
         pictures = [p for p in frame.pop("pictures", []) if Path(str(p)).is_file()]
         return {"shown": True, **frame, "images": pictures}
 
-    def _user_preferences(self) -> dict[str, Any]:
+    def _user_preferences(self, updates: dict[str, Any] | None = None) -> dict[str, Any]:
         """How he wants Claude to work, as he set it on the Setup page."""
         from integrations.cadwiz_plugin import preferences_store
 
         preferences = preferences_store.load()
+        if updates:
+            from ai_freecad_core.cadwiz_screen.preferences import FounderPreferences
+            allowed = {"slicer", "printers", "default_printer", "materials_on_hand", "print_material", "print_quality",
+                       "inches_first", "explanations", "questions", "big_changes", "licences", "model_sites", "ai_app"}
+            if set(updates) - allowed:
+                raise PlainError("Only workshop and assistant preferences can be changed here.")
+            values = preferences.to_dict()
+            values.update(updates)
+            preferences = FounderPreferences.from_dict(values)
+            preferences_store.save(preferences)
         return {"follow_these": preferences.rules_for_claude(), "preferences": preferences.to_dict(),
                 "note_for_claude": "Follow these in every reply. Teaching happens here in the Claude app when the user asks; "
                                    "the CADWiz panel only holds their choice."}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- CADWizard mark: the indigo and the four-point star are the panel's own
+       identity (WIZARD_ACCENT / WIZARD_GLYPH in workbench_ui.py), chosen over
+       FreeCAD's blue so the workbench reads as its own product. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#312E81"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#g)"/>
+  <path d="M32 13 L36.6 27.4 L51 32 L36.6 36.6 L32 51 L27.4 36.6 L13 32 L27.4 27.4 Z"
+        fill="#EEF0FF"/>
+  <circle cx="46.5" cy="17.5" r="3.1" fill="#A5B4FC"/>
+  <circle cx="17.5" cy="45.5" r="2.2" fill="#A5B4FC"/>
+</svg>

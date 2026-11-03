@@ -1,0 +1,18 @@
+{
+  "manifest_version": "0.3",
+  "name": "cadwiz",
+  "display_name": "CADWiz",
+  "version": "0.6.0",
+  "description": "Your smart CAD buddy's local connection to FreeCAD.",
+  "author": {"name": "Steve Gregerson / WizLabs"},
+  "homepage": "https://cadwiz.app",
+  "support": "https://cadwiz.app/feedback",
+  "license": "LGPL-2.1-or-later",
+  "compatibility": {"platforms": ["win32", "darwin"], "runtimes": {"node": ">=18"}},
+  "server": {
+    "type": "node",
+    "entry_point": "launcher.cjs",
+    "mcp_config": {"command": "node", "args": ["${__dirname}/launcher.cjs"]}
+  },
+  "tools_generated": true
+}
