@@ -102,7 +102,7 @@ def test_the_wiz_frames_are_the_approved_animation_frame_for_frame() -> None:
 
 def test_the_toolbar_names_the_eight_marks_in_the_approved_order() -> None:
     assert [t[1] for t in slim_panel.TOOLS] == ["Point", "Circle", "Box", "Highlight", "Lasso", "Arrow", "Measure", "Note"]
-    assert [v[1] for v in slim_panel.VIEWS] == ["Front", "Top", "Side", "Iso"]
+    assert [v[1] for v in slim_panel.VIEWS] == ["Center"]
     assert len(slim_panel.EXAMPLE_SENTENCES) == 5
 
 

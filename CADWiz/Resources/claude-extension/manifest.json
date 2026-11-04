@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "cadwiz",
   "display_name": "CADWiz",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Your smart CAD buddy's local connection to FreeCAD.",
   "author": {"name": "Steve Gregerson / WizLabs"},
   "homepage": "https://cadwiz.app",

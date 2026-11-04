@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Copyright (C) 2026 Steve Gregerson / WizLabs
 """The founder's FreeCAD 3D view, as the CADWiz panel and the Claude plug-in use it
 (ORDER-2026-10-18-01).
 
@@ -20,6 +22,7 @@ from typing import Any
 from ai_freecad_core.visual_communications.anchored import Camera, ModelAnchor
 
 CUT_AWAY_NODE = "CADWiz_CutAway"
+CUT_AWAY_SHELL = "CADWiz_CutAway_Shell"
 #: The view buttons over the picture (Side is FreeCAD's Right view).
 VIEW_NAMES = ("front", "top", "side", "iso")
 
@@ -27,11 +30,50 @@ VIEW_NAMES = ("front", "top", "side", "iso")
 def active_view(gui: Any) -> Any:
     """The active document's 3D view, or None (no document, or a non-3D view
     such as a spreadsheet is in front)."""
+    # The document's cached ActiveView can remain valid while Start or another
+    # MDI page is actually in front. The native window is the display authority.
+    with contextlib.suppress(AttributeError):
+        view = gui.getMainWindow().getActiveWindow()
+        return view if view is not None and hasattr(view, "getCameraNode") and hasattr(view, "saveImage") else None
     with contextlib.suppress(Exception):
         view = gui.ActiveDocument.ActiveView
         if view is not None and hasattr(view, "getCameraNode") and hasattr(view, "saveImage"):
             return view
     return None
+
+
+def activate_document_view(gui: Any, document: Any) -> Any:
+    """Present a model in the existing native CAD window, even if already active.
+
+    FreeCAD's setActiveDocument is a no-op when its document pointer already
+    matches. Explicitly activating the MDI view repairs the divergent Start-page
+    / hidden-view state without reopening files or discarding unsaved work.
+    """
+    if gui is None or document is None:
+        return None
+    gui.setActiveDocument(document.Name)
+    gui_doc = gui.getDocument(document.Name)
+    view = gui_doc.ActiveView
+    if view is None or (not hasattr(view, "getCameraNode") and hasattr(gui_doc, "mdiViewsOfType")):
+        views = gui_doc.mdiViewsOfType("Gui::View3DInventor")
+        if not views:
+            gui.activateView("Gui::View3DInventor", True)
+            views = gui_doc.mdiViewsOfType("Gui::View3DInventor")
+        view = views[0] if views else None
+    if view is None:
+        return None
+    # Do this even when gui.ActiveDocument already identifies this document.
+    with contextlib.suppress(AttributeError):
+        window = gui.getMainWindow()
+        native = view.cast_to_base() if hasattr(view, "cast_to_base") else view
+        window.setActiveWindow(native)
+        with contextlib.suppress(ImportError, AttributeError):
+            from PySide import QtWidgets
+            mdi = window.findChild(QtWidgets.QMdiArea)
+            if mdi is not None and mdi.activeSubWindow() is not None:
+                mdi.activeSubWindow().showMaximized()
+        window.update()
+    return view
 
 
 def read_camera(view: Any) -> Camera | None:
@@ -69,6 +111,21 @@ def set_view(view: Any, name: str) -> None:
         view.fitAll()
 
 
+def center(view: Any) -> None:
+    """Recover a panned-away model in the standard side view.
+
+    Coin's viewAll derives the target from the displayed scene, including visual
+    assembly offsets, rather than retaining a stale camera target.
+    """
+    from pivy import coin
+
+    view.viewRight()
+    view.fitAll()
+    camera = view.getCameraNode()
+    width, height = view.getSize()
+    camera.viewAll(view.getSceneGraph(), coin.SbViewportRegion(int(width), int(height)))
+
+
 def view_name(camera: Camera | None) -> str:
     """'front', 'top', 'side', 'iso', or 'turned by hand' -- from where the camera looks."""
     if camera is None:
@@ -94,18 +151,39 @@ def is_cut_away(view: Any) -> bool:
 
 
 def cut_away(view: Any, on: bool, document: Any = None) -> bool:
-    """Show the inside of the model: a clip plane through its middle, facing the
-    current view, removes the half nearest the founder. Off removes it. Only the
-    picture changes; the model is never touched."""
+    """Open a recognized housing without cutting its mechanism. Other models
+    use a camera-facing plane through their world-space visible bounds.
+    Only the picture changes; the model is never touched."""
     try:
         from pivy import coin
 
         root = _root(view)
+        # Remove any previous housing-only cut as well as a whole-scene cut.
+        for obj in getattr(document, "Objects", []):
+            with contextlib.suppress(Exception):
+                local = obj.ViewObject.RootNode
+                for i in reversed(range(local.getNumChildren())):
+                    if local.getChild(i).getName().getString() == CUT_AWAY_SHELL:
+                        local.removeChild(i)
         for i in reversed(range(root.getNumChildren())):
             if root.getChild(i).getName().getString() == CUT_AWAY_NODE:
                 root.removeChild(i)
         if not on:
             return False
+        cover = document.getObject("OrganicSnapCover") if document is not None else None
+        if cover is not None and document.getObject("EnclosedSweptCrank") is not None:
+            # The known enclosure opens along its depth, not across its height.
+            # Scope this plane to the cover so the crank and slider stay whole.
+            bounds = cover.Shape.BoundBox
+            point = (bounds.Center.x, bounds.Center.y, (bounds.ZMin + bounds.ZMax) / 2.0)
+            clip = coin.SoClipPlane()
+            clip.setName(CUT_AWAY_SHELL)
+            clip.plane.setValue(coin.SbPlane(coin.SbVec3f(0, 0, -1), coin.SbVec3f(*point)))
+            cover.ViewObject.RootNode.insertChild(clip, 0)
+            marker = coin.SoSeparator()
+            marker.setName(CUT_AWAY_NODE)
+            root.insertChild(marker, 0)
+            return True
         camera = read_camera(view)
         if camera is None:
             return False
@@ -216,11 +294,22 @@ def visible_centre(document: Any) -> tuple[float, float, float] | None:
             visible = getattr(getattr(obj, "ViewObject", None), "Visibility", getattr(obj, "Visibility", False))
             if shape is None or not visible or shape.isNull():
                 continue
-            bound = shape.BoundBox
+            bound = world_shape(obj).BoundBox
             box = bound if box is None else box.united(bound)
     if box is None:
         return None
     return (box.Center.x, box.Center.y, box.Center.z)
+
+
+def world_shape(obj: Any) -> Any:
+    """Shape already includes its own placement; apply only its parent frame."""
+    shape = obj.Shape.copy()
+    parent = None
+    with contextlib.suppress(Exception):
+        parent = obj.getParentGeoFeatureGroup()
+    if parent is not None:
+        shape.Placement = parent.getGlobalPlacement().multiply(shape.Placement)
+    return shape
 
 
 #: A mark placed this close (screen pixels) to a corner of the model snaps onto it,

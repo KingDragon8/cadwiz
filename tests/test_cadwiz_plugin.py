@@ -273,3 +273,31 @@ def test_the_slim_panel_lines(session) -> None:
     assert lines["last_change"] == "Last change: width 60 -> 70 mm"
     bridge.connected = True
     assert slim_panel.panel_lines(bridge)["connection"] == "Connected to Claude"
+
+
+def test_gui_open_uses_native_recent_file_route(session, tmp_path):
+    path = tmp_path / "cad" / "NativeRecent.FCStd"
+    path.write_bytes(b"native")
+    opened = []
+    documents = dict(session.app.listDocuments())
+    session.app.listDocuments = lambda: documents
+
+    def native_open(filename):
+        opened.append(filename)
+        documents["NativeRecent"] = _Doc("NativeRecent", filename)
+
+    session.gui = SimpleNamespace(open=native_open)
+    result = session.call("open_document", {"path": str(path)})
+    assert result["ok"]
+    assert opened == [str(path)]
+
+def test_opening_existing_document_reuses_unsaved_state(session):
+    def do_not_reopen(path):
+        raise AssertionError("Must not reopen an already loaded document")
+
+    session.gui = SimpleNamespace(open=do_not_reopen)
+    session.app.openDocument = do_not_reopen
+    session.doc.unsaved_marker = "keep me"
+    result = session.call("open_document", {"path": session.doc.FileName})
+    assert result["ok"]
+    assert session.doc.unsaved_marker == "keep me"

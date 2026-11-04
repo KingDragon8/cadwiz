@@ -510,16 +510,28 @@ class PluginSession:
             raise PlainError("That file is outside your CAD folders, so I won't open it. Add its folder to CADWiz's CAD folders first.")
         if not Path(path).is_file():
             raise PlainError("I can't find that file.")
-        for existing in dict(self.app.listDocuments()).values():
-            current = str(getattr(existing, "FileName", "") or "")
-            if current and Path(current).resolve() == Path(path).resolve():
-                return {"document": existing.Label, "file": str(path), "already_open": True,
-                        "reload_required": True,
-                        "say_to_founder": "This file is already open. The live document has been kept; it was not reloaded from disk. Save a checkpoint before closing and reopening it to load an external change."}
-        document = self.app.openDocument(str(path))
+        # The GUI file-open route also updates FreeCAD's Recent Files menu.
+        # App.openDocument alone bypasses that UI bookkeeping.
+        existing = next((d for d in self.app.listDocuments().values()
+                         if getattr(d, "FileName", "") and Path(d.FileName).resolve() == Path(path).resolve()), None)
+        if existing is not None:
+            # Re-present an open document; never reload over unsaved work.
+            document = existing
+        elif self.gui is not None and callable(getattr(self.gui, "open", None)):
+            self.gui.open(str(path))
+            document = next((d for d in self.app.listDocuments().values()
+                             if getattr(d, "FileName", "") and Path(d.FileName).resolve() == Path(path).resolve()), None)
+            if document is None:
+                raise PlainError("FreeCAD could not open that document.")
+        else:
+            document = existing or self.app.openDocument(str(path))
         with contextlib.suppress(Exception):
             self.app.setActiveDocument(document.Name)
-        return {"document": document.Label, "file": str(path)}
+        if self.gui is not None:
+            show_and_frame(self.gui, document, set() if existing is not None else visible_in_file(path))
+        return {"document": document.Label, "file": str(path), "already_open": existing is not None,
+                "reload_required": existing is not None,
+                "say_to_founder": "The open document was preserved; external changes were not reloaded." if existing is not None else "Document opened."}
 
     def _save_document(self, document: str | None = None, path: str | None = None) -> dict[str, Any]:
         target = self._document(document)
@@ -1243,11 +1255,11 @@ def show_and_frame(gui: Any, document: Any, shown: set[str]) -> None:
             obj.Visibility = True
         with contextlib.suppress(Exception):
             obj.ViewObject.Visibility = True
-    with contextlib.suppress(Exception):
-        gui.setActiveDocument(document.Name)
     view = None
     with contextlib.suppress(Exception):
-        view = gui.getDocument(document.Name).ActiveView
+        from integrations.cadwiz_plugin.view_link import activate_document_view
+
+        view = activate_document_view(gui, document)
     if view is None:
         with contextlib.suppress(Exception):
             view = gui.ActiveDocument.ActiveView

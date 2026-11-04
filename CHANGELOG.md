@@ -1,6 +1,16 @@
 # Changelog
 
-## v0.6.0 � desktop setup and faster communication screen
+## v0.6.1 — Center, Learn and mechanism motion previews
+
+- Center restores a fitted side view, replacing Front, Top, Side and Iso buttons.
+- Learn offers Show me, Guide me and Explain this through the selected assistant.
+- Animate previews supported toothpaste crank/slider and phone-holder mechanisms without changing saved placements. Toothpaste previews include both drive strings. This is a visual motion preview, not a force or collision simulation.
+- Cutaway opens the recognized toothpaste housing while keeping its mechanism whole; other models use visible world-space bounds.
+- Model presentation activates the native 3D view in the existing FreeCAD window. Dock sizing reserves usable space for the native viewport. Opening files updates Recent Files while preserving documents already open.
+- Windows, Macintosh (macOS) and Linux are clearly listed on the download page. Linux uses a supported local MCP client. Mac real-device installation remains unverified.
+- Existing 0.6.0 offline helpers, connector migration, backup/undo and export provenance are retained.
+
+## v0.6.0 — desktop setup and faster communication screen
 
 - Bundled offline Python 3.11 helpers for Windows x64, Mac Apple Silicon/Intel and Linux x64.
 - Claude desktop extension with a small Node launcher; existing Python connector retained.
