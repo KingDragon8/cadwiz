@@ -43,7 +43,7 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 
 ## Status
 
-**v0.6.0.**
+**v0.6.1.**
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;
@@ -51,7 +51,7 @@ just how you talk to it. CADWiz makes no paid calls of its own.
   printer; STL / 3MF / STEP export; technical drawing sheets; bringing in and
   repairing meshes.
 - **Not yet:** FEM, CAM, architecture, surfaces and assemblies (planned for
-  "CADWiz 2.0"). macOS and Linux should work but are less tested.
+  "CADWiz 2.0"). macOS and Linux are supported; platform testing varies.
 
 Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
 
@@ -62,9 +62,17 @@ Full list: [known limitations](CADWiz/docs/KNOWN-LIMITATIONS.md).
   - **Claude Desktop** ([claude.ai/download](https://claude.ai/download)), with a Claude subscription, **or**
   - **the ChatGPT desktop app** ([chatgpt.com/download](https://chatgpt.com/download)),
     signed in with your ChatGPT account.
-- **Windows 10 or 11** is the most tested. **macOS and Linux:** help wanted.
+- **Windows 10 or 11** is the most tested. **Macintosh (macOS) and Linux** are also supported.
 
 ## Install
+
+**Windows · Macintosh (macOS) · Linux.** Choose your system on the download page.
+Linux uses a local MCP client such as Codex CLI; the Windows/Mac desktop assistant
+apps are not Linux prerequisites. In CADWiz choose ChatGPT, then **Connect ChatGPT /
+Codex**, review the settings preview and start a new Codex CLI session. Use
+**Manual connection** for another compatible client. The bundled helper supports
+Linux x64 with FreeCAD Python 3.11.
+
 
 1. Follow the illustrated guide at [cadwiz.app/download](https://cadwiz.app/download).
 2. Install CADWiz through FreeCAD Addon Manager using its custom repository source, then restart FreeCAD.
@@ -95,7 +103,12 @@ Windows is checked in isolation. Mac helper bundles are included but real-device
 `uninstall_windows.bat`). It removes CADWiz, its shortcuts and its entry in your
 assistant app's settings, and keeps your models and their versions.
 
-**macOS / Linux (less tested):** unzip, then run `bash scripts/install.sh`.
+**macOS (less tested):** unzip, then run `bash scripts/install.sh`.
+
+**Linux:** install through Addon Manager using the steps above. For a manual
+installation, copy the ZIP's `CADWiz` folder into FreeCAD's user `Mod` folder,
+restart FreeCAD, then use **Connect ChatGPT / Codex**. The legacy shell installer
+configures Claude Desktop and is intended for macOS; it is not needed on Linux.
 
 **FreeCAD Addon Manager:** once CADWiz is listed, open **Tools > Addon manager**,
 search for **CADWiz**, press **Install**, and restart FreeCAD. Then run the

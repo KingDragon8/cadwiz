@@ -92,7 +92,7 @@ TOOLS = (("point", "Point", "Pin a spot"), ("circle", "Circle", "Circle a region
          ("lasso", "Lasso", "Draw free-hand around something"), ("arrow", "Arrow", "Point from one place to another"),
          ("measure", "Measure", "Drag between two points: the distance shows in inches and mm"),
          ("note", "Note", "Pin a short note to a spot"))
-VIEWS = (("front", "Front"), ("top", "Top"), ("side", "Side"), ("iso", "Iso"))
+VIEWS = (("center", "Center"),)
 
 # ---- THE BUTTON TABLE (ORDER-2026-10-21-01; how to change it: docs/CUSTOMIZING.md) --------
 #: Every main button on the CADWiz panel: key -> (the words on it, its object name,
@@ -768,6 +768,24 @@ class _Panel:
         self.assembly_button.setCheckable(True)
         self.assembly_button.clicked.connect(self.toggle_assembly)
         views.addWidget(self.assembly_button)
+        self.animate_button = QtWidgets.QPushButton("Animate", page)
+        self.animate_button.setObjectName("CADWiz_View_Animate")
+        self.animate_button.setProperty("role", "view")
+        self.animate_button.setCheckable(True)
+        self.animate_button.setToolTip("Preview the crank and roller moving. Click again to stop and restore. This is a motion preview, not a force simulation.")
+        self.animate_button.clicked.connect(self.toggle_animation)
+        views.addWidget(self.animate_button)
+        self.learn_button = QtWidgets.QPushButton("Learn", page)
+        self.learn_button.setObjectName("CADWiz_Learn")
+        self.learn_button.setProperty("role", "view")
+        self.learn_button.setToolTip("Learn by demonstration, guided practice, or explaining a selected feature.")
+        self.learn_button.clicked.connect(self.show_learning)
+        views.addWidget(self.learn_button)
+        self.motion = None
+        self.motion_timer = QtCore.QTimer(page)
+        self.motion_timer.setInterval(80)
+        self.motion_timer.timeout.connect(self.advance_animation)
+        page.destroyed.connect(lambda *_: self.stop_animation())
         for words, tip, command in EXTRA_BUTTONS:
             extra = QtWidgets.QPushButton(words, page)
             extra.setProperty("role", "view")
@@ -862,7 +880,7 @@ class _Panel:
         font = self.QtGui.QFont("Arial")
         font.setPixelSize(max(TEXT_PX, int(self.prefs.text_px)))
         metrics = self.QtGui.QFontMetrics(font)
-        buttons = list(self.view_buttons.values()) + [self.cut_button, self.assembly_button, self.show_model_button,
+        buttons = list(self.view_buttons.values()) + [self.cut_button, self.assembly_button, self.animate_button, self.learn_button, self.show_model_button,
                                                       self.show_concepts_button, self.show_drawing_button] + list(self.tool_buttons.values())
         buttons += [b for b in (self.content.findChild(self.QtWidgets.QPushButton, "CADWiz_Undo_Mark"),
                                 self.content.findChild(self.QtWidgets.QPushButton, "CADWiz_Clear_Marks")) if b is not None]
@@ -1025,6 +1043,9 @@ class _Panel:
         elif index == 2:
             self.drawing_screen.show()
         else:
+            from integrations.cadwiz_plugin import view_link
+            with contextlib.suppress(Exception):
+                view_link.activate_document_view(self.gui(), self.document())
             self.picture_signature = None
 
     def open_page(self, index: int) -> None:
@@ -1230,16 +1251,91 @@ class _Panel:
     def turn(self, name: str) -> None:
         from integrations.cadwiz_plugin import view_link
 
-        view = self.view()
+        view = view_link.activate_document_view(self.gui(), self.document())
         if view is None:
             return
-        view_link.set_view(view, name)
+        if name == "center":
+            view_link.center(view)
+        else:
+            view_link.set_view(view, name)
         self.wiz_player.activity()
+
+    def stop_animation(self) -> None:
+        with contextlib.suppress(RuntimeError):
+            self.motion_timer.stop()
+        if self.motion is not None:
+            self.motion.stop()
+            self.motion = None
+        with contextlib.suppress(RuntimeError):
+            self.animate_button.setChecked(False)
+            from integrations.cadwiz_plugin import view_link
+            self._marks_allowed(not view_link.is_exploded(self.document()))
+        self.picture_signature = None
+
+    def show_learning(self) -> None:
+        from integrations.cadwiz_plugin.learning import LearningPanel
+
+        self.stop_animation()
+        if not hasattr(self, "learning"):
+            self.learning = LearningPanel(self)
+        self.learning.dialog.show()
+        self.learning.dialog.raise_()
+        self.learning.dialog.activateWindow()
+
+    def toggle_animation(self) -> None:
+        from integrations.cadwiz_plugin.motion_preview import MotionPreview
+        from integrations.cadwiz_plugin import view_link
+
+        if not self.animate_button.isChecked():
+            self.stop_animation()
+            return
+        if self.assembly_button.isChecked():
+            self.assembly_button.setChecked(False)
+            self.toggle_assembly()
+        try:
+            view_link.activate_document_view(self.gui(), self.document())
+            self.motion = MotionPreview(self.document())
+            self._marks_allowed(False)
+            for button in self.tool_buttons.values():
+                button.setToolTip("Stop Animate before marking the model.")
+            self.motion_started = time.monotonic()
+            self.motion_last_capture = 0.0
+            self.motion_timer.start()
+        except Exception as exc:
+            self.stop_animation()
+            self.flash(str(exc), FOUNDER_BLUE, seconds=5.0)
+
+    def advance_animation(self) -> None:
+        if self.motion is None:
+            return
+        # Capturing the 3D view while a menu/dialog is active can steal its
+        # graphics focus. Leave native controls usable during a preview.
+        if (self.QtWidgets.QApplication.activeModalWidget() is not None
+                or self.QtWidgets.QApplication.activePopupWidget() is not None):
+            return
+        if (self.document() != self.motion.document or not self.full.isVisible()
+                or self.pages.currentIndex() != 0 or self.screen_stack.currentIndex() != 0):
+            self.stop_animation()
+            return
+        try:
+            now = time.monotonic()
+            self.motion.frame(now - self.motion_started)
+            view = self.view()
+            if view is not None:
+                view.redraw()
+            if now - self.motion_last_capture >= 0.2:
+                self.capture()
+                self.motion_last_capture = now
+        except Exception as exc:
+            with contextlib.suppress(Exception):
+                import_module("FreeCAD").Console.PrintError(f"CADWiz animation: {type(exc).__name__}: {exc}\n")
+            self.stop_animation()
+            self.flash("Motion preview stopped; the model is restored.", FOUNDER_BLUE, seconds=4.0)
 
     def toggle_cut_away(self) -> None:
         from integrations.cadwiz_plugin import view_link
 
-        view = self.view()
+        view = view_link.activate_document_view(self.gui(), self.document())
         if view is None:
             self.cut_button.setChecked(False)
             return
@@ -1251,6 +1347,7 @@ class _Panel:
         anchored to the model as it really is, so they wait until it is off."""
         from integrations.cadwiz_plugin import view_link
 
+        self.stop_animation()
         wanted = self.assembly_button.isChecked()
         document = self.document()
         why = "Open a model first." if document is None else view_link.explode(document, wanted)

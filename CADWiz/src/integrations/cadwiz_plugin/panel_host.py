@@ -36,8 +36,17 @@ TASKS_MOVED_KEY = "tasks_moved_left"
 TASKS_MOVE_DELAY_MS = 1500          # after FreeCAD has put back its own saved layout
 STRIP_WIDTH = 124
 FULL_MIN_WIDTH = 420
+CAD_MIN_WIDTH = 360
+CAD_MIN_HEIGHT = 200
+PANEL_MAX_SHARE = 0.45
 DEFAULT_FLOAT_SIZE = (1100, 900)
 KEEP_HEIGHT_CHECKS_MS = (0, 150, 400, 900)
+
+
+def usable_dock_width(requested: int, window_width: int) -> int:
+    """A saved panel width must not swallow the native CAD workspace."""
+    limit = max(FULL_MIN_WIDTH, int(window_width * PANEL_MAX_SHARE))
+    return max(FULL_MIN_WIDTH, min(int(requested), limit))
 
 
 def attach(dock: Any, panel: Any) -> "PanelHost":
@@ -88,6 +97,11 @@ class PanelHost:
         self._sketch.setInterval(500)
         self._sketch.timeout.connect(self._watch_sketcher)
         self._sketch.start()
+        self._viewport_guard = self.QtCore.QTimer(self.dock)
+        self._viewport_guard.setSingleShot(True)
+        self._viewport_guard.setInterval(150)
+        self._viewport_guard.timeout.connect(self.protect_viewport)
+        self.window.installEventFilter(self._filter)
         self.toolbar = self._ensure_toolbar()
         with contextlib.suppress(Exception):
             self.window.workbenchActivated.connect(self._workbench_changed)
@@ -138,6 +152,7 @@ class PanelHost:
             self._resize_docked(self.width_before)
         if self.settings.get("collapsed"):
             self.collapse()
+        self._viewport_guard.start()
 
     def remember(self) -> None:
         dock = self.dock
@@ -163,13 +178,50 @@ class PanelHost:
             def eventFilter(self, _obj: Any, event: Any) -> bool:  # noqa: N802
                 if event.type() in (QtCore.QEvent.Move, QtCore.QEvent.Resize):
                     host._save_timer.start()
+                    if event.type() == QtCore.QEvent.Resize and hasattr(host, "_viewport_guard"):
+                        host._viewport_guard.start()
                 return False
 
         return Filter(self.dock)
 
     def _resize_docked(self, width: int) -> None:
+        if width > STRIP_WIDTH + 20:
+            width = usable_dock_width(width, self.window.width())
         with contextlib.suppress(Exception):
             self.window.resizeDocks([self.dock], [int(width)], self.QtCore.Qt.Horizontal)
+
+    def protect_viewport(self) -> bool:
+        """Recover unusable CAD space after startup, docking, or window resizing.
+
+        Bounded layout repair, not continuous camera following. Valid manual
+        navigation is left alone; fitting runs only when the view was squeezed.
+        """
+        try:
+            mdi = self.window.findChild(self.QtWidgets.QMdiArea)
+            if mdi is None:
+                return False
+            squeezed = mdi.width() < CAD_MIN_WIDTH or mdi.height() < CAD_MIN_HEIGHT
+            changed = False
+            if not self.dock.isFloating() and not self.collapsed:
+                width = usable_dock_width(self.dock.width(), self.window.width())
+                if self.dock.width() > width + 8:
+                    self._resize_docked(width)
+                    self.width_before = width
+                    self.settings["docked_width"] = width
+                    self._save_timer.start()
+                    changed = True
+            mdi.setMinimumSize(CAD_MIN_WIDTH, CAD_MIN_HEIGHT)
+            if squeezed:
+                def frame_recovered_view():
+                    from integrations.cadwiz_plugin import view_link
+                    view = view_link.active_view(self.panel.gui())
+                    if view is not None:
+                        view.fitAll()
+                        view.redraw()
+                self.QtCore.QTimer.singleShot(0, frame_recovered_view)
+            return changed or squeezed
+        except Exception:
+            return False
 
     # ---- pop out / dock back -------------------------------------------------------------------
     def toggle_floating(self) -> None:
