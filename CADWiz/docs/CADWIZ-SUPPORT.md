@@ -1,4 +1,4 @@
-# CADWiz support — 0.6.2
+# CADWiz support — 0.8.5
 
 Start with read-only checks. Preserve open documents, unsaved work, preferences,
 old installs and backups. Never launch an extra FreeCAD GUI for diagnosis or a

@@ -98,9 +98,17 @@ class Bridge:
     def start(self) -> "Bridge":
         self._thread.start()
         self.info_path.parent.mkdir(parents=True, exist_ok=True)
-        self.info_path.write_text(json.dumps({"port": self.port, "token": self.token, "pid": os.getpid(),
-                                              "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}), encoding="utf-8")
+        self.identity = {"port": self.port, "token": self.token, "pid": os.getpid(),
+                         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        self.info_path.write_text(json.dumps(self.identity), encoding="utf-8")
         return self
+
+    def select_current(self) -> None:
+        """Explicit Connect / Show action chooses this window, never a new GUI."""
+        from integrations.cadwiz_plugin.install_setup import atomic_write
+
+        identity = {key: self.identity[key] for key in ("pid", "started_utc")}
+        atomic_write(self.info_path.parent.parent / "selected-window.json", json.dumps(identity))
 
     def stop(self) -> None:
         self._server.shutdown()

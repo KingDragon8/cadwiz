@@ -1089,6 +1089,9 @@ class _Panel:
 
     def connect_claude(self) -> None:
         from integrations.cadwiz_plugin.setup_panel import connect
+        choose = getattr(self.bridge(), "select_current", None)
+        if callable(choose):
+            choose()
         connect(self)
         self.refresh()
 
@@ -1500,6 +1503,9 @@ class _Panel:
     # ---- Show Claude -------------------------------------------------------------------------------
     def freeze_for_claude(self, request: dict[str, Any] | None = None) -> None:
         from integrations.cadwiz_plugin import view_link
+        choose = getattr(self.bridge(), "select_current", None)
+        if callable(choose):
+            choose()
 
         screen = self.screen()
         view, document, gui = self.view(), self.document(), self.gui()

@@ -21,15 +21,24 @@ from typing import Any
 def inspect(user_data: Path | None = None) -> dict[str, Any]:
     roots = [user_data / "Mod"] if user_data else candidate_mod_dirs()
     installs = []
+    issues = []
+    loadable_backups = 0
     for mod in roots:
         if not mod.is_dir():
             continue
-        for folder in sorted(mod.iterdir()):
+        try:
+            folders = sorted(mod.iterdir())
+        except OSError:
+            issues.append("An add-on folder could not be inspected. Its contents remain unverified.")
+            continue
+        for folder in folders:
             name = folder.name.lower().replace("-", "")
             if not folder.is_dir() or not ("cadwiz" in name or name == "aifreecad"):
                 continue
             # Backups are evidence, never active installations and never deleted.
             if any(word in folder.name.lower() for word in ("backup", "replaced", ".old")):
+                if (folder / "InitGui.py").is_file() or (folder / "CADWiz/InitGui.py").is_file():
+                    loadable_backups += 1
                 continue
             addon = folder / "CADWiz" if (folder / "CADWiz").is_dir() else folder
             init = addon / "InitGui.py"
@@ -45,7 +54,8 @@ def inspect(user_data: Path | None = None) -> dict[str, Any]:
                 problems.append("Panel source is missing or this is a development link install.")
             installs.append({"candidate": len(installs) + 1, "files_checked": True,
                              "problems": problems})
-    issues = []
+    if loadable_backups:
+        issues.append("Backup add-ons still contain startup code inside Mod and may also load. Preserve them; review a move outside Mod before repairing.")
     if not installs:
         issues.append("No CADWiz installation found in the checked add-on folders.")
     if len(installs) > 1:
@@ -59,7 +69,8 @@ def inspect(user_data: Path | None = None) -> dict[str, Any]:
     return {"schema_version": 1, "system": platform.system(), "architecture": platform.machine(),
             "python": platform.python_version(), "offline": True, "read_only": True,
             "directory_confidence": "confirmed" if user_data else "undetermined",
-            "installations": installs, "issues": issues, "missing_dependencies": missing,
+            "installations": installs, "loadable_backups": loadable_backups,
+            "issues": issues, "missing_dependencies": missing,
             "startup_verified": False, "ai_connection_verified": False,
             "next_action": "In the existing FreeCAD window, verify CADWiz opens and the connection works. No files were changed."}
 

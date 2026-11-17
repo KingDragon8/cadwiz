@@ -81,4 +81,5 @@ def test_a_pla_temperature_on_tpu_and_a_missing_file(tmp_path) -> None:
     pla = _write(tmp_path / "pla.gcode", GOOD_HEAD.replace("M109 S230", "M109 S250"))
     report = check_print_file(pla, material="TPU")
     assert any("outside the usual" in p for p in report.problems)
+    assert not report.printable
     assert check_print_file(tmp_path / "nope.gcode").kind == "missing"

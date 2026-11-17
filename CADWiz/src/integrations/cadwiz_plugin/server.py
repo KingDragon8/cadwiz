@@ -99,6 +99,15 @@ def _alive(info: dict[str, Any]) -> bool:
         return False
 
 
+def _selected_window() -> dict[str, Any]:
+    from integrations.cadwiz_plugin.session import plugin_data_dir
+    try:
+        value = json.loads((plugin_data_dir() / "selected-window.json").read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def _bridge() -> dict[str, Any] | None:
     """Keep the selected process across outages; never redirect edits silently.
 
@@ -106,6 +115,14 @@ def _bridge() -> dict[str, Any] | None:
     open. No operation here launches or closes FreeCAD.
     """
     requested = os.environ.get("CADWIZ_FREECAD_PID", "").strip()
+    selected = _selected_window() if not requested else {}
+    if selected:
+        for info in _bridges():
+            if all(info.get(key) == selected.get(key) for key in ("pid", "started_utc")) and _alive(info):
+                _chosen.clear()
+                _chosen.update(info)
+                return _chosen
+        return None
     if _chosen and (not requested or str(_chosen.get("pid")) == requested):
         return _chosen if _alive(_chosen) else None
     if requested:
@@ -115,10 +132,10 @@ def _bridge() -> dict[str, Any] | None:
                 _chosen.update(info)
                 return _chosen
         return None
-    for info in _bridges():
-        if _alive(info):
-            _chosen.update(info)
-            return _chosen
+    alive = [info for info in _bridges() if _alive(info)]
+    if len(alive) == 1:
+        _chosen.update(alive[0])
+        return _chosen
     return None
 
 
@@ -129,7 +146,8 @@ def _send(info: dict[str, Any], route: str, payload: dict[str, Any], timeout: fl
         return json.loads(response.read().decode("utf-8"))
 
 
-NOT_RUNNING = "FreeCAD isn't open with CADWiz right now. Open FreeCAD (CADWiz starts with it), then ask me again."
+NOT_RUNNING = ("CADWiz cannot reach the selected FreeCAD window. Keep your work open and press Connect "
+               "in that window's CADWiz panel, then try again. If FreeCAD is closed, open it first.")
 
 
 def _post(route: str, payload: dict[str, Any], timeout: float = TIMEOUT_S) -> dict[str, Any]:

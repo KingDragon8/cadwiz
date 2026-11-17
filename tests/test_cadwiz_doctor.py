@@ -23,6 +23,8 @@ def test_duplicate_installs_and_backups_preserved(tmp_path):
     result = inspect(tmp_path)
     assert len(result["installations"]) == 2
     assert any("Multiple" in issue for issue in result["issues"])
+    assert result["loadable_backups"] == 1
+    assert any("startup code" in issue for issue in result["issues"])
     assert (tmp_path / "Mod/CADWiz-backup/InitGui.py").exists()
     assert all(not item.get("startup_verified") for item in result["installations"])
 
@@ -32,3 +34,18 @@ def test_unknown_active_directory_never_reports_verified_startup(monkeypatch, tm
     result = inspect()
     assert result["directory_confidence"] == "undetermined"
     assert result["issues"]
+
+
+def test_unreadable_directory_is_reported_without_personal_path(monkeypatch, tmp_path):
+    from pathlib import Path
+    mod = tmp_path / 'Mod'
+    mod.mkdir()
+    original = Path.iterdir
+    def denied(path):
+        if path == mod:
+            raise PermissionError('PRIVATE_PATH')
+        return original(path)
+    monkeypatch.setattr(Path, 'iterdir', denied)
+    result = inspect(tmp_path)
+    assert any('could not be inspected' in issue for issue in result['issues'])
+    assert 'PRIVATE_PATH' not in str(result)

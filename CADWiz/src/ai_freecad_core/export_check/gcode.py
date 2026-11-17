@@ -161,5 +161,5 @@ def check_print_file(path: str | Path, material: str = "", expect_bed_c: float |
         problems.append(f"The bed is {bed:g} C, not the {expect_bed_c:g} C expected.")
     if expect_nozzle_c is not None and nozzle is not None and abs(nozzle - expect_nozzle_c) > 0.5:
         problems.append(f"The nozzle is {nozzle:g} C, not the {expect_nozzle_c:g} C expected.")
-    report.printable = has_moves and report.looks_complete and bed is not None and bed > 0 and nozzle is not None
+    report.printable = has_moves and report.looks_complete and not problems
     return report
