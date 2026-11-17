@@ -738,6 +738,25 @@ class SetupPage:
         ai_help.setObjectName("CADWiz_Copy_AI_Help")
         ai_help.clicked.connect(self.copy_ai_help)
         x_col.addWidget(ai_help)
+        recovery = QtWidgets.QHBoxLayout()
+        health = QtWidgets.QPushButton("Check model health", help_box)
+        health.setObjectName("CADWiz_Check_Model_Health")
+        health.clicked.connect(self.check_model_health)
+        reset = QtWidgets.QPushButton("Reset CADWiz Layout", help_box)
+        reset.setObjectName("CADWiz_Reset_Layout_Button")
+        reset.clicked.connect(lambda: self.panel.host.reset_layout())
+        recovery.addWidget(health)
+        recovery.addWidget(reset)
+        x_col.addLayout(recovery)
+        construction = QtWidgets.QCheckBox("Show construction geometry", help_box)
+        construction.setObjectName("CADWiz_Show_Construction")
+        construction.toggled.connect(self.show_construction)
+        self.construction = construction
+        x_col.addWidget(construction)
+        clean = QtWidgets.QPushButton("Clean model view", help_box)
+        clean.setObjectName("CADWiz_Clean_Model_View")
+        clean.clicked.connect(lambda: self.show_construction(False))
+        x_col.addWidget(clean)
         x_col.addWidget(self.report_result)
         x_col.addWidget(self.report_preview)
         column.addWidget(help_box)
@@ -790,9 +809,18 @@ class SetupPage:
         for site, box in self.sites.items():
             box.setChecked(site in prefs.model_sites)
         session = self.panel.session()
-        folder = prefs.project_folder or (str(session.project.folder) if session is not None else "")
-        self.folder.setText(f"Project folder: {folder}")
+        from ai_freecad_core.ai_master.project_store import default_projects_root
+        current = self.panel.document()
+        folder = str(getattr(current, "FileName", "") or "not saved yet")
+        configured = prefs.project_folder or str(default_projects_root())
+        self.folder.setText(f"Current file: {folder}\nNew project root: {configured}")
         self._folder = prefs.project_folder
+        document = self.panel.document()
+        from integrations.ai_master.parametric_checks import REFERENCE_TYPES
+        showing = document is not None and any(bool(getattr(o, "Visibility", False)) for o in document.Objects if str(o.TypeId).startswith(REFERENCE_TYPES))
+        self.construction.blockSignals(True)
+        self.construction.setChecked(bool(showing))
+        self.construction.blockSignals(False)
         self.versions_shown.setValue(prefs.versions_shown)
         self._show_cad_folders()
         self.saved.setText("")
@@ -876,8 +904,26 @@ class SetupPage:
         except ValueError as error:
             self.saved.setText(f"Not saved: {error}.")
             return
+        session = self.panel.session()
+        selected = None
+        if session is not None and self._folder:
+            from ai_freecad_core.ai_master.project_store import Project
+            try:
+                selected = Project.open(session.project.name, root=self._folder)
+            except OSError:
+                self.saved.setText("That folder is unavailable. Existing projects and saved preferences were kept.")
+                return
+        previous = self.panel.prefs
         self.panel.prefs = prefs
-        self.panel.save_preferences()
+        try:
+            self.panel.save_preferences()
+        except (OSError, ValueError) as error:
+            self.panel.prefs = previous
+            self.saved.setText(f"Preferences were not saved: {error}")
+            return
+        if selected is not None:
+            session.project = selected
+            session.register_project_root(selected.folder)
         self.saved.setText("Saved. Your assistant follows these from its next message.")
         self.refresh()
 
@@ -1034,6 +1080,26 @@ class SetupPage:
             freecad = ".".join(import_module("FreeCAD").Version()[:3])
         return {"cadwiz": CADWIZ_VERSION, "freecad": freecad or "unknown", "os": platform.platform(terse=True),
                 "claude_desktop": "unknown"}
+
+    def check_model_health(self) -> None:
+        self.report_result.setText("Checking a disposable copy; your accepted model stays unchanged…")
+        self.panel.QtWidgets.QApplication.processEvents()
+        result = self.panel._call("model_health", {})
+        health = result.get("health", {})
+        recovery = (" To make this editable, ask your assistant to reconstruct a separate native parametric copy using this model as the reference. Keep the original; its missing history cannot simply be switched on."
+                    if health.get("level") in ("E0", "E1") else "")
+        self.report_result.setText((f"{health.get('level', 'Unverified')}: save/reopen {'passed' if health.get('roundtrip') else 'failed'}. "
+                                   f"Verified changes: {', '.join(health.get('changed_parameters', [])) or 'none'}. "
+                                   + (f"Exception: {health['exception']}" if health.get('exception') else "") + recovery)
+                                  if health else result.get("say_to_founder", "Health check did not finish."))
+
+    def show_construction(self, show: bool) -> None:
+        result = self.panel._call("construction_visibility", {"show": bool(show)})
+        if result.get("ok"):
+            self.construction.blockSignals(True)
+            self.construction.setChecked(bool(show))
+            self.construction.blockSignals(False)
+        self.report_result.setText(result.get("note") or result.get("say_to_founder") or "Display updated.")
 
     def copy_ai_help(self) -> None:
         support = Path(__file__).resolve().parents[3] / "docs" / "CADWIZ-SUPPORT.md"

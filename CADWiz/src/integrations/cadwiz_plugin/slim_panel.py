@@ -847,6 +847,10 @@ class _Panel:
         self.last_change.setObjectName("CADWiz_Last_Change")
         self.last_change.setWordWrap(True)
         below.addWidget(self.last_change)
+        self.editability_label = QtWidgets.QLabel(holder)
+        self.editability_label.setObjectName("CADWiz_Editability")
+        self.editability_label.setWordWrap(True)
+        below.addWidget(self.editability_label)
         from integrations.cadwiz_plugin.panel_pages import ProblemsCard
 
         self.problems_card = ProblemsCard(self, holder)
@@ -1110,6 +1114,9 @@ class _Panel:
         from integrations.cadwiz_plugin import preferences_store
 
         preferences_store.save(self.prefs)
+        if self.bridge() is None:
+            from integrations.cadwiz_plugin.addon import start_bridge
+            start_bridge()
         self.content.setStyleSheet(style_sheet(self.prefs.text_px))
         self.snug_buttons()
         self.canvas.update()
@@ -1727,6 +1734,13 @@ class _Panel:
         self.working.setText(version_line(str(document.Label) if document is not None else "", self.latest_version))
         self.last_change.setText(last_change_line(self.stops[-1] if self.stops else None))
         self.last_change.setVisible(bool(self.last_change.text()))
+        session = self.session()
+        same_file = session is not None and document is not None and str(getattr(document, "FileName", "")) == session.state.get("file")
+        level = str(session.state.get("editability", "")) if same_file else ""
+        text = "Last editability check: " + (level or "not verified — use Setup → Check model health")
+        if level and bool(getattr(document, "Modified", False)):
+            text += " · Unsaved changes: recheck model health."
+        self.editability_label.setText(text)
         self.apply_folds()
         shown = self.screen().shown
         read = shown.get("read_by_claude_utc") if shown else None

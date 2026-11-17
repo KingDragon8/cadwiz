@@ -128,7 +128,7 @@ def test_the_tool_set_is_the_founders_list() -> None:
                                "user_preferences", "problems", "show_concepts", "concept_choice", "design_questions",
                                "import_mesh", "mesh_edit", "swap_part", "repair_mesh",
                                # ORDER-2026-10-19-06: technical drawings, founder ruling 2026-10-19
-                               "drawing"}
+                               "drawing", "model_health", "construction_visibility"}
     assert not any("delete" in name or "remove" in name for name in TOOL_NAMES)
 
 
@@ -180,6 +180,18 @@ def test_open_and_save_stay_inside_the_cad_folders(session, tmp_path) -> None:
     assert session.call("open_document", {"path": str(inside_file)})["ok"]
     existing = session.call("save_document", {"path": str(inside_file)})
     assert not existing["ok"] and "never overwrite" in existing["say_to_founder"]
+
+
+def test_native_open_falls_back_when_gui_loader_does_not_open(session, tmp_path, monkeypatch) -> None:
+    from integrations.cadwiz_plugin import session as module
+    path = tmp_path / "cad" / "Native.FCStd"
+    path.write_bytes(b"native")
+    attempts = []
+    session.gui = SimpleNamespace(open=lambda p: attempts.append(p))
+    monkeypatch.setattr(module, "show_and_frame", lambda *args: None)
+    result = session.call("open_document", {"path": str(path)})
+    assert result["ok"] and result["document"] == "Native"
+    assert attempts == [str(path)]
 
 
 def test_saving_his_file_backs_it_up_first(session) -> None:

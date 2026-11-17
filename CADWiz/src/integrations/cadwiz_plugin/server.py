@@ -34,6 +34,7 @@ INSTRUCTIONS = """CADWiz gives you hands and eyes in the user's FreeCAD on this 
 - Engineered parts (brackets, bridges, lures, boxes, knobs): follow the build rules `design_questions` returns -- PartDesign bodies, constrained sketches, named sizes, fillets and chamfers, print clearances, walls of at least two nozzle widths. Organic shapes (figurines, sculpted bodies) are meshes: `import_mesh`, `mesh_edit`, `swap_part`, `repair_mesh`.
 - If `shown_to_claude` carries `the_founder_asks` (the user pressed a button such as "Ask Claude to fix"), that is their request: do it. `problems` lists what their screen shows as problems, with the technical detail for you.
 - Measure instead of asking the user for any number the model holds (`measure`, `inspect_document`).
+- Mechanical designs default to genuinely editable native construction regardless of complexity or keyword family. Use constrained sketches, linked dimensions and PartDesign features. A Body or spreadsheet alone is insufficient. Completion requires verified save/reopen and actual driving-dimension changes; E3 is tested, E4 is never inferred from a saved file. A refusal is a request to correct the construction, not permission to weaken the check. Use the existing design_record construction_exception field only for a concrete technical reason (imports or specialised surfaces); explain the limitation to the user and preserve the original. Do not relabel a mechanical part organic to bypass acceptance. Use model_health for read-only checks on disposable copies and construction_visibility to show/hide references without deleting them.
 - When the user says "this", "here", "that one" or "what I'm showing you", call `shown_to_claude` FIRST: it is the frame they froze on their CADWiz screen with the Show Claude button -- the picture, their numbered marks (anchored on the model, with the face each sits on), their selection, the view and the version. "This" means their newest mark or their selection. If they have not pressed Show Claude, use `get_selection` and `render` with current_view=true.
 - To point back at something, draw on their screen with `mark_for_user` (your marks appear in orange beside their blue ones and stay on the model as they turn it); clear them when they no longer apply.
 - When the user refers to something that is open ("the helmet", "this cone", "it"), adopt and edit THAT object (`edit_object`, `build_model` on that document); never make a new one in its place.
@@ -196,6 +197,16 @@ def build_server() -> Any:
     def inspect_document(document: str | None = None) -> list[Any]:
         """What is open in FreeCAD: documents, object tree (types, parametric features, sketches and constraints, spreadsheets), how the main object was built, its editability level (E0-E4), key measurements and versions."""
         return reply(call("inspect_document", {"document": document}))
+
+    @server.tool(structured_output=False)
+    def model_health(document: str | None = None) -> list[Any]:
+        """Verify native features, driving-dimension changes and save/reopen on a disposable copy. Never changes the accepted model."""
+        return reply(call("model_health", {"document": document}))
+
+    @server.tool(structured_output=False)
+    def construction_visibility(show: bool = False, document: str | None = None) -> list[Any]:
+        """Show or hide construction sketches, origins and reference axes without deleting them. Save the document to keep this viewing choice."""
+        return reply(call("construction_visibility", {"show": show, "document": document}))
 
     @server.tool(structured_output=False)
     def measure(question: str = "", object: str | None = None, document: str | None = None) -> list[Any]:  # noqa: A002

@@ -56,6 +56,9 @@ def test_new_projects_use_documents_but_existing_projects_stay_put(tmp_path, mon
     assert project_store.default_projects_root() == tmp_path / "Redirected Documents/CADWiz"
     legacy = tmp_path / "CADWiz Projects"
     legacy.mkdir()
-    assert project_store.default_projects_root() == legacy
+    old_file = legacy / "existing.FCStd"
+    old_file.write_bytes(b"historical project")
+    assert project_store.default_projects_root() == tmp_path / "Redirected Documents/CADWiz"
+    assert old_file.read_bytes() == b"historical project"
     monkeypatch.setenv("CADWIZ_PROJECTS_ROOT", str(tmp_path / "Shared"))
     assert project_store.default_projects_root() == tmp_path / "Shared"

@@ -87,6 +87,7 @@ class PanelHost:
         dock.setFeatures(dock.features() | self.QtWidgets.QDockWidget.DockWidgetFloatable | self.QtWidgets.QDockWidget.DockWidgetMovable
                          | self.QtWidgets.QDockWidget.DockWidgetClosable)
         dock.topLevelChanged.connect(self._top_level_changed)
+        dock.dockLocationChanged.connect(lambda _area: self._viewport_guard.start() if hasattr(self, "_viewport_guard") else None)
         self._save_timer = self.QtCore.QTimer(panel.content)
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(600)
@@ -203,6 +204,10 @@ class PanelHost:
             squeezed = mdi.width() < CAD_MIN_WIDTH or mdi.height() < CAD_MIN_HEIGHT
             changed = False
             if not self.dock.isFloating() and not self.collapsed:
+                area = self.window.dockWidgetArea(self.dock)
+                if area in (self.QtCore.Qt.TopDockWidgetArea, self.QtCore.Qt.BottomDockWidgetArea) and squeezed:
+                    self.window.addDockWidget(self.QtCore.Qt.RightDockWidgetArea, self.dock)
+                    changed = True
                 width = usable_dock_width(self.dock.width(), self.window.width())
                 if self.dock.width() > width + 8:
                     self._resize_docked(width)
@@ -246,15 +251,34 @@ class PanelHost:
 
     def dock_back(self) -> None:
         self.dock.setFloating(False)
+        self.window.addDockWidget(self.QtCore.Qt.RightDockWidgetArea, self.dock)
         self.panel.pop_button.setText("Pop out")
         if self.width_before and not self.collapsed:
             self._resize_docked(self.width_before)
         self._save_timer.start()
 
+    def reset_layout(self) -> None:
+        """Explicit recovery affects CADWiz only; other docks and documents stay intact."""
+        self.settings["floating"] = False
+        self.settings["collapsed"] = False
+        if self.collapsed:
+            self.expand()
+        self.width_before = usable_dock_width(int(self.window.width() * 0.35), self.window.width())
+        self.dock_back()
+        self.dock.setMaximumWidth(16777215)
+        self.dock.setMaximumHeight(16777215)
+        self.dock.show()
+        self.dock.raise_()
+        self._resize_docked(self.width_before)
+        self._viewport_guard.start()
+        self.remember()
+
     def _top_level_changed(self, floating: bool) -> None:
         # Double-clicking the title bar docks or floats it (Qt does that itself).
         self.panel.pop_button.setText("Dock back" if floating else "Pop out")
         self._save_timer.start()
+        if not floating:
+            self._viewport_guard.start()
 
     # ---- collapse to the strip ---------------------------------------------------------------
     def collapse(self, auto: bool = False) -> None:
@@ -337,6 +361,9 @@ class PanelHost:
             if frames:
                 action.setIcon(self.QtGui.QIcon(frames[9] if len(frames) > 9 else frames[0]))
         action.triggered.connect(self.bring_back)
+        reset = toolbar.addAction("Reset CADWiz Layout")
+        reset.setObjectName("CADWiz_Reset_Layout")
+        reset.triggered.connect(self.reset_layout)
         window.addToolBar(toolbar)
         toolbar.show()
         return toolbar

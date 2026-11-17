@@ -55,6 +55,7 @@ class EditabilityEvidence:
     named_parameters: int = 0               # Spreadsheet aliases or named properties driving features
     recognisable_parameter_names: bool = False  # names match the Design Contract's parameters
     living_design_verified: bool = False    # the E4 test ran: save, reopen, change one parameter, others intact
+    parameter_change_verified: bool = False
     notes: list[str] = field(default_factory=list)
 
 
@@ -79,7 +80,7 @@ def assess(evidence: EditabilityEvidence, *, build_path: str = "mechanical") -> 
         if evidence.native_feature_tree:
             level = EditabilityLevel.E2
             lines.append("native feature tree present")
-            if evidence.named_parameters > 0 and evidence.recognisable_parameter_names:
+            if evidence.named_parameters > 0 and evidence.parameter_change_verified:
                 level = EditabilityLevel.E3
                 lines.append(f"{evidence.named_parameters} named parameter(s) drive the features")
                 if evidence.living_design_verified:
@@ -88,7 +89,7 @@ def assess(evidence: EditabilityEvidence, *, build_path: str = "mechanical") -> 
                 else:
                     lines.append("living-design test not run or not passed")
             elif evidence.named_parameters > 0:
-                lines.append(f"{evidence.named_parameters} parameter(s), but names do not match the contract")
+                lines.append(f"{evidence.named_parameters} driving parameter(s); change propagation not verified")
             else:
                 lines.append("no named parameters")
         else:

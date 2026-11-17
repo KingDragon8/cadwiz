@@ -1,4 +1,4 @@
-# CADWiz support — 0.8.5
+# CADWiz support â€” 0.8.6
 
 Start with read-only checks. Preserve open documents, unsaved work, preferences,
 old installs and backups. Never launch an extra FreeCAD GUI for diagnosis or a
@@ -79,3 +79,7 @@ For an assistant: read this version-matched file and the shipped known limits.
 Use evidence, distinguish confirmed/probable/undetermined, and say when you lack
 machine or repository access. Scan is excluded from this release; do not describe
 unreleased scanning as available.
+
+## Beta 0.8.6 model recovery
+
+Setup: Check model health tests a disposable snapshot; Reset CADWiz Layout restores right docking; Clean model view hides construction and Show construction reveals it. E1 is a fixed solid: ask for a separate native reconstruction, keeping the original. Accepted new mechanical models require verified native editability. An explicit direct-solid exception must explain the limitation. See docs/RELEASE-NOTES-0.8.6.md and docs/AUDIT-0.8.6.md in the package root.

@@ -85,3 +85,7 @@ jobs:
           status=$?
           cat freecad-load-check.txt 2>/dev/null || echo "freecad-load-check.txt was not written"
           exit $status
+      - name: Native parametric construction, mutation and persistence
+        run: squashfs-root/usr/bin/freecadcmd scripts/ci/native_parametric_check.py
+      - name: Production session and sandbox acceptance
+        run: squashfs-root/usr/bin/freecadcmd scripts/ci/native_session_check.py
