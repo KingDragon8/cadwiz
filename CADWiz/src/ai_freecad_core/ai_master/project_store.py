@@ -30,7 +30,39 @@ from .design_source import VersionRecord, VersionStore
 
 def default_projects_root() -> Path:
     override = os.environ.get("CADWIZ_PROJECTS_ROOT", "").strip()
-    return Path(override) if override else Path.home() / "CADWiz Projects"
+    if override:
+        return Path(override).expanduser()
+    # Keep existing projects in place. New installations use Documents/CADWiz;
+    # changing a default must never move or strand historical versions.
+    legacy = Path.home() / "CADWiz Projects"
+    if legacy.is_dir():
+        return legacy
+    return documents_directory() / "CADWiz"
+
+
+def documents_directory() -> Path:
+    """Use redirected Documents on Windows and the XDG setting on Linux."""
+    if os.name == "nt":
+        try:
+            import winreg
+
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") as key:
+                value, _kind = winreg.QueryValueEx(key, "Personal")
+            return Path(os.path.expandvars(value))
+        except (OSError, ImportError):
+            pass
+    config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "user-dirs.dirs"
+    try:
+        for line in config.read_text(encoding="utf-8").splitlines():
+            if line.startswith('XDG_DOCUMENTS_DIR="') and line.endswith('"'):
+                value = line.split('"', 2)[1].replace("${HOME}", str(Path.home())).replace("$HOME", str(Path.home()))
+                candidate = Path(value)
+                if candidate.is_absolute():
+                    return candidate
+    except (OSError, UnicodeError):
+        pass
+    return Path.home() / "Documents"
 
 
 def safe_name(name: str) -> str:

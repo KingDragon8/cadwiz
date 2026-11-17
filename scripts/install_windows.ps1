@@ -31,7 +31,7 @@
 #>
 param(
     [switch]$SourceOnly,
-    [string]$ModDir = (Join-Path $env:APPDATA "FreeCAD\v1-1\Mod"),
+    [string]$ModDir = "",
     [string]$ClaudeConfig = "",
     [string]$CodexConfig = (Join-Path $env:USERPROFILE ".codex\config.toml"),
     [string]$FreeCADBin = "",
@@ -95,6 +95,16 @@ if (-not $freecadOk) {
     exit 2
 }
 $FreeCADPython = Join-Path $FreeCADBin "python.exe"
+if (-not $ModDir) {
+    $discovered = & $FreeCADPython -c 'import FreeCAD; from pathlib import Path; print(Path(FreeCAD.getUserAppDataDir()) / "Mod")'
+    if ($LASTEXITCODE -ne 0 -or -not $discovered) {
+        throw "Could not verify FreeCAD's add-on folder. Nothing was changed. Supply -ModDir from FreeCAD.getUserAppDataDir()."
+    }
+    $ModDir = ($discovered | Select-Object -Last 1).Trim()
+}
+if ($ModDir -notmatch '^(?:[A-Za-z]:[\\/]|\\\\)' -or (Split-Path $ModDir -Leaf) -ne "Mod") {
+    throw "ModDir must be the absolute Mod folder reported by your selected FreeCAD. Nothing was changed."
+}
 
 # ---- 2. the addon -----------------------------------------------------------------------
 $AddonPath = $Source
@@ -223,7 +233,8 @@ $record = [PSCustomObject]@{
 
 # ---- 5. what changed ----------------------------------------------------------------------
 Write-Host ""
-Write-Host "Done. What this installer changed:" -ForegroundColor Green
+Write-Host "Files prepared. Startup and the assistant connection still need verification." -ForegroundColor Green
+Write-Host "What this installer changed:"
 $Changed | ForEach-Object { Write-Host "  - $_" }
 Write-Host ""
 Write-Host "Next: click CADWiz in the Start menu (or on your desktop). It opens FreeCAD with the CADWiz panel, and your assistant app."

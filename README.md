@@ -41,6 +41,13 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 
 ---
 
+## Offline help and installation checks
+
+Open **Setup → CADWiz Doctor** for read-only checks, or run
+`python CADWiz/src/integrations/cadwiz_plugin/doctor.py` if the workbench cannot load.
+Use **Copy instructions for my assistant** for version-matched help.
+See [the support guide](CADWiz/docs/CADWIZ-SUPPORT.md) and [0.6.2 changes](docs/RELEASE-NOTES-0.6.2.md).
+
 ## Status
 
 **v0.6.1.**
