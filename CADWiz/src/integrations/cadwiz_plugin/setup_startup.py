@@ -17,7 +17,6 @@ def start(freecad) -> None:
                   home / "Contents/Resources/bin/python"]
     python = next((p for p in candidates if p.is_file()), None)
     addon = Path(__file__).resolve().parents[3]
-    mod = Path(freecad.getUserAppDataDir()) / "Mod"
 
     def worker():
         global status
@@ -26,9 +25,8 @@ def start(freecad) -> None:
                 raise ValueError("CW-SETUP-PYTHON: FreeCAD's Python was not found. Use the advanced installer.")
             info = install_setup.record_runtime(addon, python, version)
             status = install_setup.repair_owned(info)
-            moved = install_setup.relocate_duplicates(mod, addon)
-            if moved:
-                status = {"code": "CW-SETUP-DUPLICATE", "message": "An older CADWiz copy was kept outside FreeCAD's add-on folder. Undo is available; restart FreeCAD."}
+            # Startup diagnosis must not move another install without a repair
+            # action. Doctor exposes duplicate candidates while preserving them.
             # Hash validation/extraction can take longer than the fast settings check.
             # It is wholly offline and never blocks FreeCAD's window.
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)

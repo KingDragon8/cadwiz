@@ -35,7 +35,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Callable
 
-from ai_freecad_core.ai_master.flags import read_settings
+from ai_freecad_core.ai_master.flags import read_settings, write_setting
 from ai_freecad_core.ai_master.project_store import Project
 from ai_freecad_core.ai_master.units import both
 from ai_freecad_core.conversation.founder_words import PLAIN_ERROR, clean_reply
@@ -1287,3 +1287,27 @@ def _adopted_executor(project: Any, name: str, file_name: str, **hooks: Any) -> 
 
     return AdoptedExecutor(project, name, file_name, pump=hooks.get("pump"), snapshot_open=hooks.get("snapshot_open"),
                            reload=hooks.get("reload"), current_view=hooks.get("current_view"))
+
+
+def listed_cad_folders() -> list[str]:
+    """The folders he added himself (Setup > Folders CADWiz may open)."""
+    return [str(p) for p in (read_settings().get("cad_folders") or []) if str(p).strip()]
+
+
+def add_cad_folder(folder: str | Path) -> list[str]:
+    """Let CADWiz open, save and export in this folder too (beta 1.0 report E-4:
+    `C:\\00 Cooloff` was refused and there was no way to allow it). His choice, made
+    on the Setup page; never added by Claude."""
+    path = str(Path(folder).resolve())
+    folders = listed_cad_folders()
+    if not any(Path(f).resolve() == Path(path) for f in folders):
+        folders.append(path)
+        write_setting("cad_folders", folders)
+    return folders
+
+
+def remove_cad_folder(folder: str | Path) -> list[str]:
+    target = Path(folder).resolve()
+    folders = [f for f in listed_cad_folders() if Path(f).resolve() != target]
+    write_setting("cad_folders", folders)
+    return folders

@@ -21,11 +21,9 @@ CHANGED=()
 case "$(uname -s)" in
   Darwin)
     FREECAD_PY="${FREECAD_PY:-/Applications/FreeCAD.app/Contents/Resources/bin/python}"
-    MOD_DIR="${MOD_DIR:-$HOME/Library/Application Support/FreeCAD/v1-1/Mod}"
     CLAUDE_CONFIG="${CLAUDE_CONFIG:-$HOME/Library/Application Support/Claude/claude_desktop_config.json}" ;;
   *)
     FREECAD_PY="${FREECAD_PY:-$(command -v freecad-python || true)}"
-    MOD_DIR="${MOD_DIR:-$HOME/.local/share/FreeCAD/v1-1/Mod}"
     CLAUDE_CONFIG="${CLAUDE_CONFIG:-$HOME/.config/Claude/claude_desktop_config.json}" ;;
 esac
 
@@ -40,12 +38,32 @@ if [ -z "$FREECAD_PY" ] || [ ! -x "$FREECAD_PY" ]; then
   exit 2
 fi
 
+# Ask the selected FreeCAD's Python; guesses can install into another version's
+# directory. An explicit MOD_DIR remains available for packaged/sandboxed builds.
+if [ -z "${MOD_DIR:-}" ]; then
+  if ! MOD_DIR="$("$FREECAD_PY" -c 'import FreeCAD; from pathlib import Path; print(Path(FreeCAD.getUserAppDataDir()) / "Mod")')"; then
+    echo "Could not verify the add-on directory. Nothing was changed."
+    echo "In your existing FreeCAD Python console, run FreeCAD.getUserAppDataDir()."
+    echo "Run again with MOD_DIR set to that directory's Mod folder."
+    exit 2
+  fi
+fi
+if [[ "$MOD_DIR" != /* ]] || [[ "$MOD_DIR" != */Mod ]]; then
+  echo "MOD_DIR must be the absolute Mod folder reported by your FreeCAD. Nothing was changed."
+  exit 2
+fi
+
 ADDON="$SOURCE"
 if [ "$SOURCE_ONLY" -eq 0 ]; then
   mkdir -p "$MOD_DIR"
   if [ -e "$MOD_DIR/CADWiz" ]; then
-    mv "$MOD_DIR/CADWiz" "$MOD_DIR/CADWiz.backup.$STAMP"
-    CHANGED+=("Kept your earlier CADWiz as $MOD_DIR/CADWiz.backup.$STAMP")
+    # FreeCAD loads InitGui.py from every child of Mod, including backup folders.
+    # Keep the backup outside Mod so it cannot register a duplicate workbench.
+    BACKUPS="$(dirname "$MOD_DIR")/CADWiz-backups"
+    mkdir -p "$BACKUPS"
+    KEPT="$BACKUPS/CADWiz.$STAMP.$$"
+    mv "$MOD_DIR/CADWiz" "$KEPT"
+    CHANGED+=("Kept your earlier CADWiz as $KEPT")
   fi
   cp -R "$SOURCE" "$MOD_DIR/CADWiz"
   ADDON="$MOD_DIR/CADWiz"
@@ -90,6 +108,7 @@ else
   CHANGED+=("The ChatGPT desktop app is not set up here, so only Claude was connected. Install it and run this again to use ChatGPT.")
 fi
 
-echo; echo "Done. What this script changed:"
+echo; echo "Files prepared. FreeCAD startup and the assistant connection still need verification."
+echo "What this script changed:"
 for line in "${CHANGED[@]}"; do echo "  - $line"; done
 echo; echo "Next: open FreeCAD, then Claude Desktop. The light on the CADWiz panel turns green within a minute."

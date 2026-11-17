@@ -117,6 +117,7 @@ class AiChoice:
         panel = self.panel
         lights = ai_lights(panel.bridge(), panel.prefs.ai_app)
         first = lights[0]
+        # Preserve the selected assistant's reconnect progress in the header.
         if getattr(panel, "connector", None) is not None:
             first = panel.light_now()
         panel.light.setText(f"● {first['line']}")
@@ -366,8 +367,14 @@ class PrintingPage:
         slicer = QtWidgets.QPushButton("Open in slicer", holder)
         slicer.setObjectName("CADWiz_Open_Slicer")
         slicer.clicked.connect(self.open_in_slicer)
+        # Beta 1.0 report E-15 / I-7: a project file named .gcode once reached his printer.
+        check_file = QtWidgets.QPushButton("Check a print file…", holder)
+        check_file.setObjectName("CADWiz_Check_Print_File")
+        check_file.setToolTip("Before printing: is it really G-code, and what bed and nozzle temperatures does it use?")
+        check_file.clicked.connect(self.check_print_file)
         flow.addWidget(folder)
         flow.addWidget(slicer)
+        flow.addWidget(check_file)
         self.export_result = QtWidgets.QLabel("Files go to CADWiz's project folder; nothing of yours is overwritten.", export)
         self.export_result.setObjectName("CADWiz_Export_Result")
         self.export_result.setWordWrap(True)
@@ -448,7 +455,12 @@ class PrintingPage:
         reply = panel._call("export", {"format": fmt, "document": document.Name})
         if reply.get("ok") and reply.get("path"):
             self.last_export = str(reply["path"])
-            self.export_result.setText(f"Saved {self.last_export}")
+            paths = [str(p) for p in reply.get("paths") or [self.last_export]]
+            if len(paths) > 1:
+                self.export_result.setText(f"Saved {len(paths)} print files, one per part, in {Path(paths[0]).parent}:\n"
+                                           + "\n".join(Path(p).name for p in paths))
+            else:
+                self.export_result.setText(f"Saved {self.last_export}")
         else:
             self.export_result.setText(reply.get("say_to_founder") or "The export did not finish.")
 
@@ -460,6 +472,15 @@ class PrintingPage:
         if folder is not None:
             folder.mkdir(parents=True, exist_ok=True)
             self.panel.QtGui.QDesktopServices.openUrl(self.panel.QtCore.QUrl.fromLocalFile(str(folder)))
+
+    def check_print_file(self) -> None:
+        from ai_freecad_core.export_check import check_print_file
+
+        chosen, _filter = self.panel.QtWidgets.QFileDialog.getOpenFileName(
+            self.page, "Check a print file", str(Path.home()), "Print files (*.gcode *.gco *.g *.bgcode);;All files (*)")
+        if chosen:
+            report = check_print_file(chosen, material=str(self.panel.prefs.print_material or ""))
+            self.export_result.setText(("✔ " if report.printable else "✖ ") + report.say())
 
     def open_in_slicer(self) -> None:
         if not self.last_export or not Path(self.last_export).is_file():
@@ -594,6 +615,23 @@ class SetupPage:
         folder_row.addWidget(self.folder, 1)
         folder_row.addWidget(choose)
         v_col.addLayout(folder_row)
+        # Beta 1.0 report E-4: CADWiz refused his helmet folder and nothing let him allow it.
+        v_col.addWidget(QtWidgets.QLabel("Folders CADWiz may open (your Documents folder always can):", saving))
+        self.cad_folder_list = QtWidgets.QListWidget(saving)
+        self.cad_folder_list.setObjectName("CADWiz_Setup_CAD_Folders")
+        self.cad_folder_list.setMaximumHeight(90)
+        v_col.addWidget(self.cad_folder_list)
+        cad_row = QtWidgets.QHBoxLayout()
+        add_folder = QtWidgets.QPushButton("Add folder…", saving)
+        add_folder.setObjectName("CADWiz_Setup_Add_CAD_Folder")
+        add_folder.clicked.connect(self.add_cad_folder)
+        remove_folder = QtWidgets.QPushButton("Remove", saving)
+        remove_folder.setObjectName("CADWiz_Setup_Remove_CAD_Folder")
+        remove_folder.clicked.connect(self.remove_cad_folder)
+        cad_row.addWidget(add_folder)
+        cad_row.addWidget(remove_folder)
+        cad_row.addStretch(1)
+        v_col.addLayout(cad_row)
         shown_row = QtWidgets.QHBoxLayout()
         self.versions_shown = QtWidgets.QSpinBox(saving)
         self.versions_shown.setRange(1, 500)
@@ -690,7 +728,16 @@ class SetupPage:
         buttons = QtWidgets.QHBoxLayout()
         buttons.addWidget(report)
         buttons.addWidget(get_help)
+        doctor = QtWidgets.QPushButton("CADWiz Doctor", help_box)
+        doctor.setObjectName("CADWiz_Doctor")
+        doctor.setToolTip("Offline installation checks. No repairs, uploads or new FreeCAD windows.")
+        doctor.clicked.connect(self.run_doctor)
+        buttons.addWidget(doctor)
         x_col.addLayout(buttons)
+        ai_help = QtWidgets.QPushButton("Copy instructions for my assistant", help_box)
+        ai_help.setObjectName("CADWiz_Copy_AI_Help")
+        ai_help.clicked.connect(self.copy_ai_help)
+        x_col.addWidget(ai_help)
         x_col.addWidget(self.report_result)
         x_col.addWidget(self.report_preview)
         column.addWidget(help_box)
@@ -747,6 +794,7 @@ class SetupPage:
         self.folder.setText(f"Project folder: {folder}")
         self._folder = prefs.project_folder
         self.versions_shown.setValue(prefs.versions_shown)
+        self._show_cad_folders()
         self.saved.setText("")
         from ai_freecad_core.ai.spend_guard import _log_rows
 
@@ -787,6 +835,31 @@ class SetupPage:
         if chosen:
             self._folder = chosen
             self.folder.setText(f"Project folder: {chosen}")
+
+    def _show_cad_folders(self) -> None:
+        from integrations.cadwiz_plugin.session import listed_cad_folders
+
+        self.cad_folder_list.clear()
+        self.cad_folder_list.addItems(listed_cad_folders())
+
+    def add_cad_folder(self) -> None:
+        """Saved at once, like the folder list in File Explorer -- no Save settings needed."""
+        from integrations.cadwiz_plugin.session import add_cad_folder
+
+        chosen = self.panel.QtWidgets.QFileDialog.getExistingDirectory(self.page, "A folder CADWiz may open", str(Path.home()))
+        if chosen:
+            add_cad_folder(chosen)
+            self._show_cad_folders()
+            self.saved.setText(f"Added. CADWiz may now open files in {chosen}.")
+
+    def remove_cad_folder(self) -> None:
+        from integrations.cadwiz_plugin.session import remove_cad_folder
+
+        item = self.cad_folder_list.currentItem()
+        if item is not None:
+            remove_cad_folder(item.text())
+            self._show_cad_folders()
+            self.saved.setText("Removed. Files you already have open are not affected.")
 
     def save(self) -> None:
         self._keep_printer(self._current)
@@ -961,6 +1034,33 @@ class SetupPage:
             freecad = ".".join(import_module("FreeCAD").Version()[:3])
         return {"cadwiz": CADWIZ_VERSION, "freecad": freecad or "unknown", "os": platform.platform(terse=True),
                 "claude_desktop": "unknown"}
+
+    def copy_ai_help(self) -> None:
+        support = Path(__file__).resolve().parents[3] / "docs" / "CADWIZ-SUPPORT.md"
+        text = ("Help me troubleshoot CADWiz. Read the version-matched support instructions below. "
+                "Start with read-only checks, preserve my files and use my existing FreeCAD window.\n\n")
+        try:
+            text += support.read_text(encoding="utf-8")
+        except OSError:
+            text += "Run CADWiz Doctor from Setup. Do not assume installation, startup and AI connection are the same check."
+        self.panel.QtWidgets.QApplication.clipboard().setText(text)
+        self.report_result.setText("Support instructions copied. Paste them into your chosen assistant; nothing was sent.")
+
+    def run_doctor(self) -> None:
+        from integrations.cadwiz_plugin.doctor import inspect
+
+        session = self.panel.session()
+        user_data = None
+        if session is not None:
+            getter = getattr(session.app, "getUserAppDataDir", None)
+            if callable(getter):
+                user_data = Path(getter())
+        result = inspect(user_data)
+        lines = ["CADWiz Doctor — offline, read-only", *result["issues"]]
+        for item in result["installations"]:
+            lines.extend(item["problems"])
+        lines.append(result["next_action"])
+        self.report_result.setText("\n".join(lines))
 
     def get_help(self) -> None:
         from integrations.cadwiz_plugin.error_report import load_report

@@ -100,11 +100,21 @@ def _alive(info: dict[str, Any]) -> bool:
 
 
 def _bridge() -> dict[str, Any] | None:
-    """The user's FreeCAD: the bridge last used if it still answers, else the
-    newest one that does."""
-    if _chosen and _alive(_chosen):
-        return _chosen
-    _chosen.clear()
+    """Keep the selected process across outages; never redirect edits silently.
+
+    CADWIZ_FREECAD_PID explicitly selects a running instance when several are
+    open. No operation here launches or closes FreeCAD.
+    """
+    requested = os.environ.get("CADWIZ_FREECAD_PID", "").strip()
+    if _chosen and (not requested or str(_chosen.get("pid")) == requested):
+        return _chosen if _alive(_chosen) else None
+    if requested:
+        for info in _bridges():
+            if str(info.get("pid")) == requested and _alive(info):
+                _chosen.clear()
+                _chosen.update(info)
+                return _chosen
+        return None
     for info in _bridges():
         if _alive(info):
             _chosen.update(info)
