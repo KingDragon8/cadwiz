@@ -83,3 +83,9 @@ def test_a_pla_temperature_on_tpu_and_a_missing_file(tmp_path) -> None:
     assert any("outside the usual" in p for p in report.problems)
     assert not report.printable
     assert check_print_file(tmp_path / "nope.gcode").kind == "missing"
+
+
+def test_zero_nozzle_temperature_is_rejected_without_a_selected_material(tmp_path):
+    report = check_print_file(_write(tmp_path / "heater-off.gcode", GOOD_HEAD.replace("M109 S230", "M109 S0")))
+    assert not report.printable
+    assert any("nozzle heater" in problem for problem in report.problems)

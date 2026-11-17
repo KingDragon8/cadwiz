@@ -152,6 +152,8 @@ def check_print_file(path: str | Path, material: str = "", expect_bed_c: float |
         problems.append("The bed is set to 0 C (heater off), so the print will likely come loose.")
     if nozzle is None:
         problems.append("It never sets the nozzle temperature.")
+    elif nozzle <= 0:
+        problems.append("The nozzle heater is set to 0 C, so this is not ready to print.")
     ranges = MATERIAL_RANGES.get(material.strip().upper())
     if ranges and nozzle is not None and not ranges[0][0] <= nozzle <= ranges[0][1]:
         problems.append(f"{nozzle:g} C is outside the usual {ranges[0][0]}-{ranges[0][1]} C for {material.upper()}.")
