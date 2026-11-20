@@ -51,7 +51,7 @@ Source: "{#SourceRoot}\scripts\uninstall_windows.ps1"; DestDir: "{tmp}\payload\s
 Source: "{#SourceRoot}\CADWiz\*"; DestDir: "{tmp}\payload\CADWiz"; Excludes: "__pycache__,*.pyc,*.pyo"; Flags: dontcopy recursesubdirs createallsubdirs
 
 [Run]
-Filename: "{code:GetFreeCADExe}"; Parameters: """{code:GetManager}"" --open"; Description: "Open FreeCAD with CADWiz"; Flags: postinstall nowait skipifsilent; Check: CanOpenFreeCAD
+Filename: "{code:GetFreeCADExe}"; Parameters: """{code:GetManager}"" --open"; WorkingDir: "{code:GetFreeCADDirectory}"; Description: "Open FreeCAD with CADWiz"; Flags: postinstall nowait skipifsilent runascurrentuser; Check: CanOpenFreeCAD
 
 [Code]
 var
@@ -176,6 +176,9 @@ begin Result := ExtractFilePath(VerifiedFreeCAD) + 'pythonw.exe'; end;
 
 function GetManager(Param: String): String;
 begin Result := AddBackslash(DataFolder) + 'windows_wizard.py'; end;
+
+function GetFreeCADDirectory(Param: String): String;
+begin Result := ExtractFileDir(VerifiedFreeCAD); end;
 
 function CanOpenFreeCAD: Boolean;
 begin
