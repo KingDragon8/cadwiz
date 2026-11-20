@@ -1,5 +1,7 @@
 """Real Windows shells and Python, mocked FreeCAD API (not a native 1.1.4 test)."""
 import os
+import hashlib
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -39,3 +41,18 @@ def test_original_inline_command_reproduces_nameerror(tmp_path):
     script.write_text("& 'C:/Program Files/FreeCAD 1.1/bin/python.exe' -c 'from pathlib import Path; print(Path.cwd() / \"Mod\")'\nexit $LASTEXITCODE\n")
     result = subprocess.run(['powershell.exe', '-NoProfile', '-File', str(script)], capture_output=True, text=True, timeout=60)
     assert result.returncode != 0 and "name 'Mod' is not defined" in result.stderr
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows shell required')
+@pytest.mark.parametrize('tampered', [False, True])
+def test_uninstall_hash_verification_without_optional_ps_modules(tmp_path, tampered):
+    helper=tmp_path/'windows_installer.py'; helper.write_text('# fixture, never executed')
+    digest=hashlib.sha256(helper.read_bytes()).hexdigest()
+    record={'schema':2,'product':'CADWiz','managed_files':{str(helper):digest},'python':'C:/CADWiz-Missing-Python/python.exe'}
+    (tmp_path/'install.json').write_text(json.dumps(record))
+    if tampered: helper.write_text('modified fixture')
+    result=subprocess.run(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
+                           str(ROOT/'scripts/uninstall_windows.ps1'),'-DataDir',str(tmp_path),'-Yes'],
+                          env=dict(os.environ,PSModulePath=str(tmp_path/'No Modules')),capture_output=True,text=True,timeout=60)
+    assert result.returncode != 0
+    assert ('helper changed' if tampered else 'FreeCAD Python is unavailable') in result.stdout

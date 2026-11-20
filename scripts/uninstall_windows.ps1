@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 param([string]$DataDir=(Join-Path $env:LOCALAPPDATA 'CADWiz'),[switch]$Yes)
 $ErrorActionPreference='Stop'
+function File-Sha256([string]$path) {
+    $stream=[IO.File]::OpenRead($path)
+    $hash=[Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($hash.ComputeHash($stream)).Replace('-','').ToLowerInvariant() }
+    finally { $stream.Dispose(); $hash.Dispose() }
+}
 try {
     $recordPath=Join-Path $DataDir 'install.json'
     if(-not (Test-Path -LiteralPath $recordPath)){Write-Host 'No CADWiz installation record found. Nothing removed.';exit 2}
@@ -8,7 +14,7 @@ try {
     $helper=Join-Path $DataDir 'windows_installer.py'
     if($record.schema -ne 2 -or $record.product -ne 'CADWiz'){throw 'This legacy record cannot prove safe removal. Nothing removed; use FreeCAD Addon Manager.'}
     $expected=$record.managed_files.PSObject.Properties | Where-Object {$_.Name -eq $helper} | Select-Object -ExpandProperty Value
-    if(-not $expected -or (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected){throw 'The uninstall helper changed or is missing. Nothing removed; use FreeCAD Addon Manager.'}
+    if(-not $expected -or -not [IO.File]::Exists($helper) -or (File-Sha256 $helper) -ne $expected){throw 'The uninstall helper changed or is missing. Nothing removed; use FreeCAD Addon Manager.'}
     $python=[string]$record.python
     if((Split-Path -Leaf $python) -ne 'python.exe' -or -not (Test-Path -LiteralPath $python)){throw 'FreeCAD Python is unavailable. Reinstall FreeCAD or use Addon Manager; saved files were kept.'}
     if(-not $Yes -and (Read-Host 'Remove CADWiz from FreeCAD and keep models/preferences? [y/N]') -notmatch '^(y|yes)$'){Write-Host 'Cancelled. Nothing removed.';exit 1}
