@@ -37,7 +37,8 @@ PRINT_TIME_HONEST = ("Print time and filament: your slicer shows these when you 
                      "CADWiz can't read them from {slicer} yet.")
 
 
-CLAUDE_USAGE_LINE = "Your talks with your assistant come out of your Claude or ChatGPT subscription. There is no charge per question."
+CLAUDE_USAGE_LINE = ("Your assistant uses your chosen account's access and limits. "
+                     "CADWiz does not add a per-question fee; free access and remaining capacity depend on the provider.")
 
 
 def usage_lines(rows: list[dict[str, Any]]) -> list[str]:

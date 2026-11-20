@@ -289,7 +289,7 @@ def test_setup_usage_is_one_sentence_about_the_subscription() -> None:
     rows = [{"made_by": "founder", "event": "usage", "provider": "p", "utc": "2026-10-12T01:00:00Z", "input_tokens": 1200}]
     for log in ([], rows):
         assert panel_pages.usage_lines(log) == [panel_pages.CLAUDE_USAGE_LINE]
-    assert "no charge per question" in panel_pages.CLAUDE_USAGE_LINE
+    assert "limits" in panel_pages.CLAUDE_USAGE_LINE and "remaining capacity" in panel_pages.CLAUDE_USAGE_LINE
 
 
 def test_chatgpt_turns_green_only_on_a_real_chatgpt_hello() -> None:

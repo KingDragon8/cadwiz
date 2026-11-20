@@ -3,6 +3,15 @@
 # build on anything not listed. Adding an entry is a deliberate act.
 
 [[allowed]]
+path = "CADWiz/src/integrations/cadwiz_plugin/free_ai_connection.py"
+purpose = "Explicit user-initiated direct-provider enrollment; verify a Groq API key without inference"
+sends = "Only the user-entered API key as HTTPS Authorization to the fixed Groq models endpoint. No CAD data, prompts, pictures, dimensions or inference requests. Explicit consent required at the request boundary."
+receives = "A bounded available-model list or sanitized connection error; no content is executed"
+hosts = ["api.groq.com", "openrouter.ai", "api.cloudflare.com", "generativelanguage.googleapis.com", "api.cerebras.ai", "api.mistral.ai", "api.github.com"]
+user_initiated = true
+justification = "The November 19 founder request authorizes implementing the Free AI onboarding. This enrollment check is a GET only; redirects are disabled, timeout/body size are bounded, and the OS stores credentials. A connected API is not a qualified CAD route or verified free billing."
+
+[[allowed]]
 path = "CADWiz/src/ai_freecad_core/ai/spend_guard.py"
 purpose = "The automated-spend guard: wraps urllib's urlopen so an automated run cannot reach a paid AI service (founder ruling 2026-10-06, ORDER-2026-10-06-02)"
 sends = "Nothing of its own. It forwards a request to the ORIGINAL urlopen only after deciding the caller may make it; for an automated run asking for a paid AI host it refuses before anything is sent"

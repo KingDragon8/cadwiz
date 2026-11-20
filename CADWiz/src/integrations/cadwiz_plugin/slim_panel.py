@@ -547,6 +547,9 @@ class _Panel:
         self.setup = SetupPage(self)
         self.pages.addWidget(self.printing.page)
         self.pages.addWidget(self.setup.page)
+        from integrations.cadwiz_plugin.free_ai import FreeAIPage
+        self.free_ai = FreeAIPage(self)
+        self.pages.addWidget(self.free_ai.page)
         column.addWidget(self.pages, 1)
         self.strip = self._build_strip()
         outer.addWidget(self.strip)
@@ -711,15 +714,15 @@ class _Panel:
         return header
 
     def _build_page_bar(self) -> Any:
-        """Creating · Printing · Setup, and Pop out (section 2.6)."""
+        """Navigation wraps at narrow dock widths rather than squeezing the CAD view."""
         QtWidgets = self.QtWidgets
         bar = QtWidgets.QFrame(self.full)
         bar.setObjectName("CADWiz_Page_Bar")
-        row = QtWidgets.QHBoxLayout(bar)
+        row = _make_flow_layout(self.QtCore, QtWidgets)(bar, 6)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(6)
         self.page_buttons = []
-        for index, name in enumerate(("Creating", "Printing", "Setup")):
+        for index, name in enumerate(("Creating", "Printing", "Setup", "Free AIWiz")):
             button = QtWidgets.QPushButton(name, bar)
             button.setObjectName(f"CADWiz_Page_{name}")
             button.setProperty("role", "page")
@@ -728,7 +731,6 @@ class _Panel:
             row.addWidget(button)
             self.page_buttons.append(button)
         self.page_buttons[0].setChecked(True)
-        row.addStretch(1)
         self.pop_button = _button(QtWidgets, "pop_out", bar)
         self.pop_button.clicked.connect(lambda: self.host.toggle_floating())
         row.addWidget(self.pop_button)
@@ -1060,6 +1062,8 @@ class _Panel:
             self.printing.refresh()
         if index == 2:
             self.setup.refresh()
+        if index == 3:
+            self.free_ai.refresh()
 
     def connection_now(self) -> dict[str, str]:
         return self.light_now()
@@ -1698,6 +1702,8 @@ class _Panel:
 
     # ---- the slow refresh -----------------------------------------------------------------------
     def refresh(self) -> None:
+        if self.pages.currentIndex() == 3:
+            self.free_ai.refresh()
         light = self.light_now()
         self.light.setText(f"● {light['line']}")
         self.light.setStyleSheet(f"color: {light['light']}; font-weight: 700;")

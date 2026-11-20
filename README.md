@@ -46,11 +46,18 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 Open **Setup → CADWiz Doctor** for read-only checks, or run
 `python CADWiz/src/integrations/cadwiz_plugin/doctor.py` if the workbench cannot load.
 Use **Copy instructions for my assistant** for version-matched help.
-See [the support guide](CADWiz/docs/CADWIZ-SUPPORT.md) and [0.8.6 changes](docs/RELEASE-NOTES-0.8.6.md).
+See [the support guide](CADWiz/docs/CADWIZ-SUPPORT.md) and [0.8.8 changes](docs/RELEASE-NOTES-0.8.8.md).
+
+## Free AIWiz beta trial
+
+Open **Free AIWiz** for provider guides, account setup and connection status.
+Secure API-key enrollment is currently Windows-only. Automatic AI generation
+and provider switching are not enabled; existing assistant connections remain
+available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**v0.6.1.**
+**Beta 0.8.8.**
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;
