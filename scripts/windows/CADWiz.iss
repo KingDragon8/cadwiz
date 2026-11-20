@@ -17,6 +17,7 @@ AppPublisherURL=https://cadwiz.app
 DefaultDirName={localappdata}\CADWiz
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 WizardSizePercent=110
 DisableWelcomePage=no

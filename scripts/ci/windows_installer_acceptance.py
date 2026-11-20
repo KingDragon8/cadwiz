@@ -15,6 +15,7 @@ def main():
     p.add_argument('--freecad-bin', type=Path, required=True)
     p.add_argument('--installer', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--autodetect', action='store_true')
     args = p.parse_args()
     args.freecad_bin = args.freecad_bin.resolve()
     args.installer = args.installer.resolve()
@@ -53,10 +54,13 @@ def main():
         (args.output / 'acceptance.json').write_text(json.dumps(result, indent=2))
         assert (proc.returncode == 0) == success, (name, proc.returncode, proc.stdout[-1200:], proc.stderr[-1200:])
     def install(name, success=True, bin_dir=None):
-        run(name, [str(args.installer), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/SP-', '/NORESTART',
-                   '/FREECADBIN=' + str(bin_dir or args.freecad_bin), '/DATADIR=' + str(data),
+        command = [str(args.installer), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/SP-', '/NORESTART',
+                   '/DATADIR=' + str(data),
                    '/STARTMENUDIR=' + str(menu), '/DESKTOPDIR=' + str(desktop),
-                   '/LOG=' + str((args.output / (name + '-setup.log')).resolve())], success)
+                   '/LOG=' + str((args.output / (name + '-setup.log')).resolve())]
+        if bin_dir is not None or not args.autodetect:
+            command.append('/FREECADBIN=' + str(bin_dir or args.freecad_bin))
+        run(name, command, success)
     def remove(name):
         # No --data-dir: prove installed-manager defaults target its own isolated receipt.
         run(name, [str(args.freecad_bin / 'python.exe'), str(data / 'windows_wizard.py'), '--remove', '--yes'])
@@ -94,6 +98,7 @@ def main():
     assert owner_apps_entry() == apps_before, 'Owner Windows Apps registration changed'
     result.update(ok=True, native_freecad='1.1.4', protected_unchanged=True,
                   owner_apps_registration_unchanged=True,
+                  automatic_freecad_detection_tested=args.autodetect,
                   note='Real packaged Windows installation checks; no desktop-account enrollment or live AI calls.')
     (args.output / 'acceptance.json').write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))

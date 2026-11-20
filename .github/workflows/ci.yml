@@ -114,12 +114,17 @@ jobs:
           if ((Get-FileHash $archive).Hash.ToLowerInvariant() -ne '4828741fc91ee37fafcdb97a1abacb18b04ba451ac4372d9ff7a7349b36f4d6d') { throw 'FreeCAD checksum mismatch' }
           & "$env:ProgramFiles\7-Zip\7z.exe" x $archive "-o$tools" -y | Out-Null
           if ($LASTEXITCODE -ne 0) { throw 'FreeCAD extraction failed' }
+          # Expose the verified portable files at the normal 64-bit Program Files
+          # convention on this disposable hosted VM. Never create this on an owner PC.
+          $autoPath = Join-Path $env:ProgramFiles 'FreeCAD CADWiz QA 1.1.4'
+          if (Test-Path -LiteralPath $autoPath) { throw 'Unexpected existing automatic-detection fixture' }
+          New-Item -ItemType Junction -Path $autoPath -Target (Join-Path $tools 'FreeCAD_1.1.4-Windows-x86_64-py311') | Out-Null
           "CADWIZ_TEST_FREECAD_BIN=$tools\FreeCAD_1.1.4-Windows-x86_64-py311\bin" | Out-File $env:GITHUB_ENV -Append
           "CADWIZ_INNO_COMPILER=$compilerDir\ISCC.exe" | Out-File $env:GITHUB_ENV -Append
       - name: Build the committed customer installer
         run: python scripts/release/build_windows_installer.py --compiler "$env:CADWIZ_INNO_COMPILER" --output windows-release
       - name: Install, upgrade, uninstall and recover using native FreeCAD
-        run: python scripts/ci/windows_installer_acceptance.py --freecad-bin "$env:CADWIZ_TEST_FREECAD_BIN" --installer windows-release/CADWiz-Setup-0.9.0.exe --output windows-acceptance
+        run: python scripts/ci/windows_installer_acceptance.py --freecad-bin "$env:CADWIZ_TEST_FREECAD_BIN" --installer windows-release/CADWiz-Setup-0.9.0.exe --output windows-acceptance --autodetect
       - name: Native Windows shell regressions must not skip
         run: |
           python -m pip install pytest
