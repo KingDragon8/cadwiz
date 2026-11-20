@@ -33,6 +33,7 @@ SetupIconFile={#SourceRoot}\CADWiz\Resources\icons\cadwiz.ico
 Compression=lzma2
 SolidCompression=yes
 SetupLogging=yes
+SetupMutex=Local\CADWizSetup
 VersionInfoVersion={#AppVersion}.0
 
 [Messages]
@@ -40,11 +41,7 @@ WelcomeLabel1=CADWiz for FreeCAD
 WelcomeLabel2=Create, mark and edit your models with your AI assistant.%n%nSetup finds FreeCAD, verifies its add-on folder and keeps recovery copies when upgrading.%n%nSave your work and close FreeCAD before continuing.
 FinishedHeadingLabel=CADWiz is installed
 FinishedLabel=Open FreeCAD to see the CADWiz panel.%n%nIn CADWiz, choose Setup and connect your assistant. The connection is confirmed when your assistant can inspect the open model.
-ButtonNext=Continue
 ButtonInstall=Install CADWiz
-
-[Tasks]
-Name: desktop; Description: "Add a CADWiz desktop shortcut"; Flags: checkedonce
 
 [Files]
 Source: "{#SourceRoot}\scripts\windows_installer.py"; DestDir: "{tmp}\payload\scripts"; Flags: dontcopy
@@ -59,6 +56,7 @@ Filename: "{code:GetFreeCADExe}"; Parameters: """{code:GetManager}"" --open"; De
 [Code]
 var
   FreeCADPage: TInputFileWizardPage;
+  DesktopChoice: TNewCheckBox;
   DataFolder, ResultFile, PythonExe, VerifiedFreeCAD: String;
   PayloadReady, Installed: Boolean;
 
@@ -105,11 +103,26 @@ begin
     'Check your FreeCAD installation',
     'Setup detected the FreeCAD application below. If it is missing or different, choose FreeCAD.exe. No folder commands or repository settings are needed.');
   FreeCADPage.Add('FreeCAD application:', 'FreeCAD|FreeCAD.exe', '.exe');
+  DesktopChoice := TNewCheckBox.Create(WizardForm);
+  DesktopChoice.Parent := FreeCADPage.Surface;
+  DesktopChoice.Caption := 'Add a CADWiz desktop shortcut';
+  DesktopChoice.Left := FreeCADPage.Edits[0].Left;
+  DesktopChoice.Top := FreeCADPage.Edits[0].Top + FreeCADPage.Edits[0].Height + ScaleY(16);
+  DesktopChoice.Width := FreeCADPage.SurfaceWidth;
+  DesktopChoice.Height := ScaleY(24);
+  DesktopChoice.Checked := ExpandConstant('{param:NODESKTOP|0}') <> '1';
   Found := ExpandConstant('{param:FREECADBIN|}');
   if Found <> '' then Found := AddBackslash(Found) + 'FreeCAD.exe';
   if Found = '' then Found := Candidate(ExpandConstant('{autopf}'));
   if Found = '' then Found := Candidate(ExpandConstant('{localappdata}\Programs'));
   FreeCADPage.Values[0] := Found;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = FreeCADPage.ID then WizardForm.NextButton.Caption := '&Install CADWiz'
+  else if CurPageID = wpWelcome then WizardForm.NextButton.Caption := SetupMessage(msgButtonNext)
+  else if CurPageID = wpFinished then WizardForm.NextButton.Caption := SetupMessage(msgButtonFinish);
 end;
 
 function RunHelper(const Action, Extra: String): Boolean;
@@ -152,7 +165,7 @@ begin
   DesktopFolder := ExpandConstant('{param:DESKTOPDIR|}');
   if DesktopFolder = '' then DesktopFolder := ExpandConstant('{userdesktop}');
   Extra := '--source ' + Quoted(ExpandConstant('{tmp}\payload\CADWiz')) + ' --start-menu ' + Quoted(MenuFolder);
-  if WizardIsTaskSelected('desktop') then Extra := Extra + ' --desktop ' + Quoted(DesktopFolder);
+  if DesktopChoice.Checked then Extra := Extra + ' --desktop ' + Quoted(DesktopFolder);
   WizardForm.StatusLabel.Caption := 'Verifying the offline connector and installing CADWiz...';
   if RunHelper('install', Extra) then Installed := True
   else Result := GetIniString('result', 'message', 'Setup stopped. Keep the setup log for support; your recovery copies are preserved.', ResultFile);
