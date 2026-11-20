@@ -1,243 +1,96 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-# Copyright (C) 2026 Steve Gregerson / WizLabs
-<#
-.SYNOPSIS
-  Installs CADWiz into FreeCAD and connects it to Claude Desktop.
-
-.DESCRIPTION
-  1. Checks for FreeCAD 1.1. If it is missing or older, it ASKS whether to open
-     FreeCAD's official download page -- it never downloads anything by itself.
-  2. Copies the CADWiz folder into FreeCAD's Mod folder (an older CADWiz there is
-     kept, renamed CADWiz.backup.<date>).
-  3. Installs the one package the Claude connection needs (mcp 1.27) into
-     FreeCAD's own Python.
-  4. Connects the AI app you use: adds CADWiz to Claude Desktop's settings and, if
-     the ChatGPT desktop app is set up, to its settings too -- after saving a
-     copy of each.
-  5. Adds CADWiz to the Start menu -- a CADWiz shortcut that opens FreeCAD and
-     your assistant app together, and Uninstall CADWiz -- and, if you say yes, a
-     CADWiz icon on the desktop.
-  6. Says exactly what it changed.
-
-  Close FreeCAD and Claude Desktop first. Double-click install_windows.bat, or run:
-    powershell -ExecutionPolicy Bypass -File scripts\install_windows.ps1
-
-.PARAMETER SourceOnly
-  For developers: do not copy anything into FreeCAD; point Claude Desktop at the
-  CADWiz folder in this checkout instead.
-.PARAMETER ModDir / ClaudeConfig / FreeCADBin / Yes
-  For tests: where FreeCAD's Mod folder and Claude's settings file are, where
-  FreeCAD is installed, and answer yes to the questions.
+<# Double-click install_windows.bat. Works with Windows PowerShell 5.1 and PowerShell 7.
+   No inline Python, pip installation, account changes or automatic application launch.
+   Advanced fallback: -FreeCADBin <bin folder> -ModDir <verified user Mod folder>.
+   -CheckOnly verifies discovery without installing. Close FreeCAD before installation.
 #>
 param(
-    [switch]$SourceOnly,
-    [string]$ModDir = "",
-    [string]$ClaudeConfig = "",
-    [string]$CodexConfig = (Join-Path $env:USERPROFILE ".codex\config.toml"),
-    [string]$FreeCADBin = "",
-    [string]$StartMenuDir = (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\CADWiz"),
-    [string]$DesktopDir = [Environment]::GetFolderPath("Desktop"),
-    [string]$DataDir = (Join-Path $env:LOCALAPPDATA "CADWiz"),
-    [switch]$Yes,
-    [switch]$NoDesktop,
-    [switch]$NoPip
+    [string]$FreeCADBin='', [string]$ModDir='',
+    [string]$DataDir=(Join-Path $env:LOCALAPPDATA 'CADWiz'),
+    [string]$StartMenuDir=(Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\CADWiz'),
+    [string]$DesktopDir=[Environment]::GetFolderPath('Desktop'),
+    [switch]$Yes, [switch]$NoDesktop, [switch]$CheckOnly,
+    [switch]$NoPip, [switch]$SourceOnly,
+    [string]$ClaudeConfig='', [string]$CodexConfig=''
 )
-$ErrorActionPreference = "Stop"
-$Repo = Split-Path -Parent $PSScriptRoot
-$Source = Join-Path $Repo "CADWiz"
-$Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$Changed = New-Object System.Collections.Generic.List[string]
-$FreeCADDownload = "https://www.freecad.org/downloads.php"
-
-function Ask([string]$Question) {
-    if ($Yes) { return $true }
-    $answer = Read-Host "$Question [y/N]"
-    return $answer -match '^(y|yes)$'
+$ErrorActionPreference='Stop'
+$helper=Join-Path $PSScriptRoot 'windows_installer.py'
+$source=Join-Path (Split-Path -Parent $PSScriptRoot) 'CADWiz'
+function Ask([string]$text) { if($Yes){return $true}; return (Read-Host ($text+' [y/N]')) -match '^(y|yes)$' }
+function Invoke-Setup([string[]]$Arguments) {
+    $output=[IO.Path]::GetTempFileName()
+    try {
+        $previous=$ErrorActionPreference
+        try {
+            $ErrorActionPreference='Continue'
+            & $script:python $script:helper @Arguments --output-file $output | Out-Host
+            $code=$LASTEXITCODE
+        } finally { $ErrorActionPreference=$previous }
+        $text=[IO.File]::ReadAllText($output,[Text.Encoding]::UTF8)
+        if(-not $text.Trim()){throw 'FreeCAD Python did not return a setup result. Reinstall the official FreeCAD package and try again.'}
+        $result=$text | ConvertFrom-Json
+        if($code -ne 0 -or -not $result.ok){throw $result.message}
+        return $result.result
+    } finally { Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue }
 }
-
-Write-Host "CADWiz installer" -ForegroundColor Cyan
-if (-not (Test-Path -LiteralPath (Join-Path $Source "InitGui.py"))) { throw "The CADWiz folder was not found next to this script ($Source)." }
-
-# ---- 1. FreeCAD 1.1 -------------------------------------------------------------------
-if (-not $FreeCADBin) {
-    # FreeCAD installs for everyone (Program Files) or "just for me" (the user's own
-    # Programs folder); look in both.
-    $found = @("$env:ProgramFiles\FreeCAD 1.*\bin\freecad.exe", "$env:LOCALAPPDATA\Programs\FreeCAD 1.*\bin\freecad.exe") |
-        ForEach-Object { Get-ChildItem $_ -ErrorAction SilentlyContinue } |
-        Sort-Object FullName -Descending | Select-Object -First 1
-    if ($found) { $FreeCADBin = Split-Path -Parent $found.FullName }
-}
-$freecadOk = $false
-$version = ""
-if ($FreeCADBin -and (Test-Path -LiteralPath (Join-Path $FreeCADBin "freecad.exe"))) {
-    # Ask FreeCAD itself ("FreeCAD 1.1.4 Revision: ..."): the folder name and the file's
-    # version stamp are not reliable -- a portable FreeCAD_1.1.4-... folder has neither
-    # in the expected form, and was refused (ORDER-2026-10-23-02).
-    $cmd = Join-Path $FreeCADBin "freecadcmd.exe"
-    if (Test-Path -LiteralPath $cmd) {
-        $said = (& $cmd --version 2>$null | Select-Object -First 1)
-        if ($said -match 'FreeCAD (\d+)\.(\d+)(\.\d+)?') { $version = $Matches[0] -replace '^FreeCAD ', '' }
+try {
+    Write-Host 'CADWiz Windows installer - offline, reversible setup' -ForegroundColor Cyan
+    if(-not (Test-Path -LiteralPath $helper) -or -not (Test-Path -LiteralPath (Join-Path $source 'InitGui.py'))){
+        throw 'The package is incomplete. Right-click the downloaded ZIP, choose Extract All, then run install_windows.bat from the extracted folder.'
     }
-    if (-not $version) { $version = (Get-Item -LiteralPath (Join-Path $FreeCADBin "freecad.exe")).VersionInfo.ProductVersion }
-    $freecadOk = ($version -match '^(1\.(1|[2-9])|[2-9]\.)') -or (-not $version -and $FreeCADBin -match 'FreeCAD[ _]1\.(1|[2-9])')
-    Write-Host "FreeCAD found: $FreeCADBin (version $version)"
-}
-if (-not $freecadOk) {
-    $what = if ($version) { "FreeCAD $version was found, but CADWiz needs FreeCAD 1.1 or newer." } else { "CADWiz needs FreeCAD 1.1 or newer, and it was not found on this computer." }
-    Write-Host "$what Get the latest from $FreeCADDownload (free)." -ForegroundColor Yellow
-    # Unattended runs (-Yes) never open a browser.
-    if (-not $Yes -and (Ask "Open FreeCAD's official download page now? (You install it, then run this installer again.)")) {
-        Start-Process $FreeCADDownload
-        Write-Host "Opened $FreeCADDownload. Install FreeCAD 1.1, then run this installer again."
-    } else {
-        Write-Host "Nothing was changed. Install FreeCAD 1.1 from $FreeCADDownload, then run this installer again."
-    }
-    exit 2
-}
-$FreeCADPython = Join-Path $FreeCADBin "python.exe"
-if (-not $ModDir) {
-    $discovered = & $FreeCADPython -c 'import FreeCAD; from pathlib import Path; print(Path(FreeCAD.getUserAppDataDir()) / "Mod")'
-    if ($LASTEXITCODE -ne 0 -or -not $discovered) {
-        throw "Could not verify FreeCAD's add-on folder. Nothing was changed. Supply -ModDir from FreeCAD.getUserAppDataDir()."
-    }
-    $ModDir = ($discovered | Select-Object -Last 1).Trim()
-}
-if ($ModDir -notmatch '^(?:[A-Za-z]:[\\/]|\\\\)' -or (Split-Path $ModDir -Leaf) -ne "Mod") {
-    throw "ModDir must be the absolute Mod folder reported by your selected FreeCAD. Nothing was changed."
-}
-
-# ---- 2. the addon -----------------------------------------------------------------------
-$AddonPath = $Source
-if (-not $SourceOnly) {
-    New-Item -ItemType Directory -Path $ModDir -Force | Out-Null
-    $target = Join-Path $ModDir "CADWiz"
-    # An earlier CADWiz is kept OUTSIDE FreeCAD's Mod folder: FreeCAD loads every folder
-    # in Mod, so a backup left there would still start with FreeCAD (ORDER-2026-10-23-02).
-    $backups = Join-Path $DataDir "backups"
-    $earlier = @(Get-Item -LiteralPath $target -ErrorAction SilentlyContinue) +
-               @(Get-ChildItem -LiteralPath $ModDir -Directory -Filter "CADWiz.backup.*" -ErrorAction SilentlyContinue)
-    foreach ($old in $earlier) {
-        New-Item -ItemType Directory -Path $backups -Force | Out-Null
-        $kept = Join-Path $backups "$($old.Name).$Stamp"
-        Move-Item -LiteralPath $old.FullName -Destination $kept
-        $Changed.Add("Moved your earlier CADWiz ($($old.Name)) out of FreeCAD, to $kept")
-    }
-    Copy-Item -LiteralPath $Source -Destination $target -Recurse
-    Get-ChildItem -LiteralPath $target -Directory -Recurse -Filter "__pycache__" | Remove-Item -Recurse -Force
-    $AddonPath = $target
-    $Changed.Add("Installed CADWiz into $target")
-}
-
-# ---- 3. the one package the Claude connection needs ------------------------------------
-if (-not $NoPip) {
-    Write-Host "Installing the Claude connection package (mcp 1.27) into FreeCAD's Python..."
-    & $FreeCADPython -m pip install --user --disable-pip-version-check --quiet "mcp==1.27.0"
-    if ($LASTEXITCODE -ne 0) { throw "Installing mcp into FreeCAD's Python failed (see above). Nothing else was changed after this point." }
-    $Changed.Add("Installed mcp 1.27 into FreeCAD's Python ($FreeCADPython)")
-}
-
-# ---- 4. Claude Desktop's settings ---------------------------------------------------------
-# Claude Desktop from claude.ai/download is a Microsoft Store (MSIX) app: it reads its
-# settings from its own package folder, never from %APPDATA%\Claude. Writing only the
-# %APPDATA% file left the founder's laptop red forever (ORDER-2026-10-23-02).
-if (-not $ClaudeConfig) {
-    $package = Get-ChildItem (Join-Path $env:LOCALAPPDATA "Packages") -Directory -Filter "Claude_*" -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    $ClaudeConfig = if ($package) { Join-Path $package.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json" }
-                    else { Join-Path $env:APPDATA "Claude\claude_desktop_config.json" }
-}
-Write-Host "Claude Desktop's settings: $ClaudeConfig"
-$server = Join-Path $AddonPath "src\integrations\cadwiz_plugin\server.py"
-$configDir = Split-Path -Parent $ClaudeConfig
-New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-if (Test-Path -LiteralPath $ClaudeConfig) {
-    $saved = "$ClaudeConfig.before-cadwiz-$Stamp"
-    Copy-Item -LiteralPath $ClaudeConfig -Destination $saved
-    $Changed.Add("Saved a copy of Claude Desktop's settings as $saved")
-    $raw = Get-Content -Raw -LiteralPath $ClaudeConfig
-    $config = if ($raw.Trim()) { $raw | ConvertFrom-Json } else { New-Object PSObject }
-} else {
-    $config = New-Object PSObject
-}
-if (-not ($config.PSObject.Properties.Name -contains "mcpServers")) {
-    $config | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue (New-Object PSObject)
-}
-$entry = [PSCustomObject]@{ command = $FreeCADPython; args = @($server) }
-$config.mcpServers | Add-Member -NotePropertyName "cadwiz" -NotePropertyValue $entry -Force
-$json = $config | ConvertTo-Json -Depth 32
-[IO.File]::WriteAllText($ClaudeConfig, $json, (New-Object Text.UTF8Encoding $false))
-$Changed.Add("Added CADWiz to Claude Desktop's settings ($ClaudeConfig)")
-
-# ---- 4b. The ChatGPT desktop app (it keeps its tool settings in .codex\config.toml) ---------
-if (Test-Path -LiteralPath $CodexConfig) {
-    $codexText = Get-Content -Raw -LiteralPath $CodexConfig
-    if ($codexText -match '(?m)^\[mcp_servers\.cadwiz\]') {
-        $Changed.Add("The ChatGPT app already had CADWiz in its settings ($CodexConfig); left as it was")
-        $cadwizSection = [regex]::Match($codexText, '(?ms)^\[mcp_servers\.cadwiz\]\s*\n(.*?)(?=^\[|\z)').Groups[1].Value
-        if ($codexText -notmatch 'CADWIZ_CLIENT_APP' -and $codexText -notmatch '(?m)^\[mcp_servers\.cadwiz\.env\]' -and $cadwizSection -notmatch '(?m)^\s*env\s*=') {
-            Copy-Item -LiteralPath $CodexConfig -Destination "$CodexConfig.before-cadwiz-$Stamp"
-            [IO.File]::AppendAllText($CodexConfig, "`n[mcp_servers.cadwiz.env]`nCADWIZ_CLIENT_APP = 'chatgpt'`n", (New-Object Text.UTF8Encoding $false))
-            $Changed.Add("Identified the existing CADWiz connector as ChatGPT, after saving its settings")
+    if($SourceOnly){throw 'SourceOnly no longer changes assistant settings. Use -CheckOnly for discovery, or install normally and connect from CADWiz Setup.'}
+    if(-not $FreeCADBin){
+        $candidates=@("$env:ProgramFiles\FreeCAD 1.*\bin\FreeCAD.exe", "$env:LOCALAPPDATA\Programs\FreeCAD 1.*\bin\FreeCAD.exe") |
+            ForEach-Object {Get-ChildItem -Path $_ -ErrorAction SilentlyContinue} | Sort-Object FullName -Descending
+        if($candidates){$FreeCADBin=Split-Path -Parent ($candidates | Select-Object -First 1).FullName}
+        elseif(-not $Yes){
+            Add-Type -AssemblyName System.Windows.Forms
+            $picker=New-Object Windows.Forms.OpenFileDialog
+            $picker.Title='Select FreeCAD.exe from your supported FreeCAD installation'
+            $picker.Filter='FreeCAD|FreeCAD.exe'
+            if($picker.ShowDialog() -eq 'OK'){$FreeCADBin=Split-Path -Parent $picker.FileName}
         }
-    } else {
-        $savedCodex = "$CodexConfig.before-cadwiz-$Stamp"
-        Copy-Item -LiteralPath $CodexConfig -Destination $savedCodex
-        $block = "`n[mcp_servers.cadwiz]`ncommand = '$FreeCADPython'`nargs = ['$server']`nstartup_timeout_sec = 60`n[mcp_servers.cadwiz.env]`nCADWIZ_CLIENT_APP = 'chatgpt'`n"
-        [IO.File]::AppendAllText($CodexConfig, $block, (New-Object Text.UTF8Encoding $false))
-        $Changed.Add("Saved a copy of the ChatGPT app's settings as $savedCodex")
-        $Changed.Add("Added CADWiz to the ChatGPT app's settings ($CodexConfig)")
     }
-} else {
-    $Changed.Add("The ChatGPT desktop app is not set up on this computer, so only Claude was connected. Install it and run this again to use ChatGPT.")
+    if(-not $FreeCADBin){throw 'FreeCAD 1.1 or newer was not found. Install it from https://www.freecad.org/downloads.php, then run this installer again.'}
+    $python=Join-Path $FreeCADBin 'python.exe'
+    if(-not (Test-Path -LiteralPath (Join-Path $FreeCADBin 'FreeCAD.exe')) -or -not (Test-Path -LiteralPath $python)){
+        throw 'Select the FreeCAD bin folder containing FreeCAD.exe and python.exe. CADWiz does not need a separate Python installation.'
+    }
+    $info=Invoke-Setup @('discover')
+    Write-Host ('FreeCAD verified: '+$info.version+' at '+$FreeCADBin)
+    if(-not $ModDir){$ModDir=$info.mod_dir}
+    if(-not $ModDir -and -not $Yes){
+        Write-Host 'Automatic folder discovery failed. Open FreeCAD once first. If you know its user Mod directory, select it below.' -ForegroundColor Yellow
+        Add-Type -AssemblyName System.Windows.Forms
+        $picker=New-Object Windows.Forms.FolderBrowserDialog
+        $picker.Description='Select the FreeCAD user Mod folder beside user.cfg, NOT Program Files'
+        if($picker.ShowDialog() -eq 'OK'){$ModDir=$picker.SelectedPath}
+    }
+    if(-not $ModDir){throw 'Could not discover the user Mod folder. Open FreeCAD once, close it and retry. Advanced users can supply -ModDir; no scripts need editing.'}
+    if($CheckOnly){Write-Host ('Discovery only; nothing installed. User Mod directory: '+$ModDir);exit 0}
+    if(-not (Test-Path -LiteralPath (Join-Path $FreeCADBin 'pythonw.exe'))){throw 'FreeCAD pythonw.exe is missing. Repair the FreeCAD installation first.'}
+    if(-not (Ask ('Install CADWiz into '+$ModDir+'? Existing verified CADWiz files will be backed up.'))){Write-Host 'Cancelled. Nothing installed.';exit 1}
+    $target=Join-Path $ModDir 'CADWiz'
+    $specs=@(
+        @{path=(Join-Path $StartMenuDir 'CADWiz.lnk'); target=(Join-Path $FreeCADBin 'pythonw.exe'); arguments=('"'+(Join-Path $target 'src\integrations\cadwiz_plugin\launch.py')+'"'); description='Open FreeCAD with CADWiz'; working_directory=$FreeCADBin},
+        @{path=(Join-Path $StartMenuDir 'Uninstall CADWiz.lnk'); target=(Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'); arguments=('-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $DataDir 'uninstall_windows.ps1')+'" -DataDir "'+$DataDir+'"'); description='Uninstall CADWiz; keep models and preferences'; working_directory=$DataDir}
+    )
+    if(-not $NoDesktop -and (Ask 'Add a CADWiz desktop shortcut?')){
+        if(-not $DesktopDir){throw 'Windows did not report a Desktop folder. Retry with -NoDesktop.'}
+        $specs+=@{path=(Join-Path $DesktopDir 'CADWiz.lnk'); target=(Join-Path $FreeCADBin 'pythonw.exe'); arguments=('"'+(Join-Path $target 'src\integrations\cadwiz_plugin\launch.py')+'"'); description='Open FreeCAD with CADWiz'; working_directory=$FreeCADBin}
+    }
+    $plan=[IO.Path]::GetTempFileName()
+    try {
+        [IO.File]::WriteAllText($plan,(ConvertTo-Json -InputObject @($specs) -Depth 6),(New-Object Text.UTF8Encoding $false))
+        $receipt=Invoke-Setup @('install','--source',$source,'--mod-dir',$ModDir,'--data-dir',$DataDir,'--shortcut-plan',$plan)
+    } finally {Remove-Item -LiteralPath $plan -Force -ErrorAction SilentlyContinue}
+    Write-Host ('CADWiz files installed and verified: '+$receipt.addon) -ForegroundColor Green
+    if($receipt.backup){Write-Host ('Previous add-on kept at: '+$receipt.backup)}
+    Write-Host 'No account settings were changed; no pip/network install was needed.'
+    Write-Host 'Next: open FreeCAD. In CADWiz choose Setup, then your assistant connection. Startup and communication must still be verified.'
+    exit 0
+} catch {
+    Write-Host ('CADWiz setup stopped: '+$_.Exception.Message) -ForegroundColor Red
+    Write-Host 'Keep this message for support. Do not delete older installations or backups.'
+    exit 1
 }
-
-# ---- 4c. the CADWiz shortcut, and how to uninstall -----------------------------------------
-# One click on CADWiz opens FreeCAD and the assistant chosen in the panel together. It runs
-# through FreeCAD's own windowless Python, so no console window flashes.
-$Pythonw = Join-Path $FreeCADBin "pythonw.exe"
-$Launch = Join-Path $AddonPath "src\integrations\cadwiz_plugin\launch.py"
-$Icon = Join-Path $AddonPath "Resources\icons\cadwiz.ico"
-$Shell = New-Object -ComObject WScript.Shell
-function New-Shortcut([string]$Path, [string]$Target, [string]$Arguments, [string]$Description) {
-    $link = $Shell.CreateShortcut($Path)
-    $link.TargetPath = $Target
-    $link.Arguments = $Arguments
-    $link.WorkingDirectory = $FreeCADBin
-    $link.Description = $Description
-    if (Test-Path -LiteralPath $Icon) { $link.IconLocation = "$Icon,0" }
-    $link.Save()
-}
-New-Item -ItemType Directory -Path $StartMenuDir, $DataDir -Force | Out-Null
-$Uninstaller = Join-Path $DataDir "uninstall_windows.ps1"
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot "uninstall_windows.ps1") -Destination $Uninstaller -Force
-$Shortcuts = New-Object System.Collections.Generic.List[string]
-$startLink = Join-Path $StartMenuDir "CADWiz.lnk"
-New-Shortcut $startLink $Pythonw "`"$Launch`"" "Open FreeCAD with CADWiz, and your assistant app"
-$Shortcuts.Add($startLink)
-$uninstallLink = Join-Path $StartMenuDir "Uninstall CADWiz.lnk"
-New-Shortcut $uninstallLink "powershell.exe" "-NoProfile -ExecutionPolicy Bypass -File `"$Uninstaller`"" "Remove CADWiz from this computer"
-$Shortcuts.Add($uninstallLink)
-$Changed.Add("Added CADWiz to the Start menu (CADWiz, and Uninstall CADWiz)")
-if (-not $NoDesktop -and (Ask "Add a CADWiz icon to your desktop? It opens FreeCAD and your assistant app together.")) {
-    $deskLink = Join-Path $DesktopDir "CADWiz.lnk"
-    New-Shortcut $deskLink $Pythonw "`"$Launch`"" "Open FreeCAD with CADWiz, and your assistant app"
-    $Shortcuts.Add($deskLink)
-    $Changed.Add("Added a CADWiz icon to your desktop")
-}
-# What the uninstaller undoes -- exactly this, nothing else.
-$record = [PSCustomObject]@{
-    installed = (Get-Date).ToString("s"); addon = $(if ($SourceOnly) { "" } else { $AddonPath })
-    claude_config = $ClaudeConfig; codex_config = $CodexConfig; shortcuts = @($Shortcuts); start_menu = $StartMenuDir
-}
-[IO.File]::WriteAllText((Join-Path $DataDir "install.json"), ($record | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding $false))
-
-# ---- 5. what changed ----------------------------------------------------------------------
-Write-Host ""
-Write-Host "Files prepared. Startup and the assistant connection still need verification." -ForegroundColor Green
-Write-Host "What this installer changed:"
-$Changed | ForEach-Object { Write-Host "  - $_" }
-Write-Host ""
-Write-Host "Next: click CADWiz in the Start menu (or on your desktop). It opens FreeCAD with the CADWiz panel, and your assistant app."
-Write-Host "The light at the top of the panel turns green within a minute. Choose Claude or ChatGPT at the top of the panel."
-Write-Host "To remove CADWiz later: Start menu > CADWiz > Uninstall CADWiz."
-exit 0

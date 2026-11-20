@@ -57,7 +57,8 @@ available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**Beta 0.8.8.**
+**Beta 0.8.9.** Includes the [Windows installer repair](docs/RELEASE-NOTES-0.8.9.md)
+and the Free AIWiz features from 0.8.8.
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;
@@ -104,14 +105,15 @@ Windows is checked in isolation. Mac helper bundles are included but real-device
 2. Close FreeCAD, and quit your assistant app fully: right-click its icon by the clock
    and choose **Quit** (closing its window leaves it running, and it reads CADWiz's
    settings only when it starts).
-3. Double-click **`install_windows.bat`**. If FreeCAD 1.1 isn't installed, it asks
-   whether to open FreeCAD's download page. It never downloads anything by itself.
-   It then copies CADWiz into FreeCAD and connects CADWiz to Claude Desktop and,
-   if you have it, the ChatGPT desktop app, saving a copy of each app's settings first.
-   It adds **CADWiz** to the Start menu (and, if you say yes, to your desktop), and it
-   lists everything it changed.
-4. Click **CADWiz**. It opens FreeCAD with the CADWiz panel, together with your
-   assistant app.
+3. Double-click **`install_windows.bat`** from the fully extracted ZIP. It verifies
+   FreeCAD and its user folder, checks the bundled offline connector, and installs
+   CADWiz with recovery backups. If FreeCAD is missing, follow the displayed
+   official download link. No separate Python, administrator access or pip is needed.
+   It adds **CADWiz** to the Start menu and optionally the desktop. Unknown or
+   duplicate installations are preserved for support to resolve.
+4. Open FreeCAD, then use CADWiz **Setup** to connect your assistant. The installer
+   itself does not modify assistant settings. See the
+   [Windows installation and recovery guide](docs/RELEASE-NOTES-0.8.9.md).
 
 **To remove CADWiz:** Start menu > CADWiz > **Uninstall CADWiz** (or double-click
 `uninstall_windows.bat`). It removes CADWiz, its shortcuts and its entry in your
