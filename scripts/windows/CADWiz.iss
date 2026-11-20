@@ -42,6 +42,7 @@ WelcomeLabel1=CADWiz for FreeCAD
 WelcomeLabel2=Create, mark and edit your models with your AI assistant.%n%nSetup finds FreeCAD, verifies its add-on folder and keeps recovery copies when upgrading.%n%nSave your work and close FreeCAD before continuing.
 FinishedHeadingLabel=CADWiz is installed
 FinishedLabel=Open FreeCAD to see the CADWiz panel.%n%nIn CADWiz, choose Setup and connect your assistant. The connection is confirmed when your assistant can inspect the open model.
+FinishedLabelNoIcons=Open FreeCAD to see the CADWiz panel.%n%nIn CADWiz, choose Setup and connect your assistant. The connection is confirmed when your assistant can inspect the open model.
 ButtonInstall=Install CADWiz
 
 [Files]
