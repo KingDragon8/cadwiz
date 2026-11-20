@@ -23,7 +23,7 @@ def widgets():
 
 
 def core(data):
-    helper = Path(__file__).with_name('windows_installer.py')
+    helper = Path(__file__).with_name('windows_installer.py').resolve()
     # Installed managers must prove integrity before loading executable helper code.
     record = Path(data) / 'install.json'
     if Path(__file__).parent.resolve() == Path(data).resolve() and record.is_file():
@@ -128,7 +128,7 @@ def remove(data, yes):
 
 
 def perform(args):
-    data = Path(args.data_dir)
+    data = Path(args.data_dir).resolve()
     if args.qt_check:
         QtWidgets = widgets()
         app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv[:1])

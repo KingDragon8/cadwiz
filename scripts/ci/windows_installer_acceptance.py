@@ -21,7 +21,7 @@ def main():
     args.output = args.output.resolve()
     assert os.name == 'nt', 'This acceptance check requires real Windows'
     args.output.mkdir(parents=True, exist_ok=True)
-    qa = Path(tempfile.mkdtemp(prefix="CADWiz QA [spaces] O'Neil "))
+    qa = Path(tempfile.mkdtemp(prefix="CADWiz QA [spaces] O'Neil ")).resolve()
     profile = qa / 'FreeCAD Profile'; (profile / 'temp').mkdir(parents=True)
     data = qa / 'Setup Manager'; menu = qa / 'Start Menu'; desktop = qa / 'Desktop'
     key = 'Software\\CADWiz\\InstallerTests\\' + uuid.uuid4().hex
@@ -72,7 +72,7 @@ def main():
     assert not data.exists()
     install('fresh-install')
     receipt = json.loads((data / 'install.json').read_text())
-    assert Path(receipt['mod_dir']) == profile / 'Mod'
+    assert Path(receipt['mod_dir']).samefile(profile / 'Mod'), (receipt['mod_dir'], str(profile / 'Mod'))
     assert receipt['freecad_version'] == '1.1.4', receipt['freecad_version']
     assert len(list(menu.glob('*.lnk'))) == 2 and len(list(desktop.glob('*.lnk'))) == 1
     run('graphical-uninstaller-dependencies', [str(args.freecad_bin / 'python.exe'),
