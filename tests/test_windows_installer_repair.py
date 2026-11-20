@@ -201,3 +201,38 @@ def test_reinstall_after_uninstall_reuses_only_verified_manager_files(area):
     (area.data / 'windows_installer.py').write_text('owner modified manager')
     with pytest.raises(installer.SetupError, match='preserved'):
         install(area)
+
+
+def test_wizard_registration_failure_rolls_back_addon_and_manager(area):
+    original = install(area)
+    receipt = (area.data / 'install.json').read_bytes()
+    def refuse(_):
+        raise installer.SetupError('unrelated Apps registration')
+    with pytest.raises(installer.SetupError, match='unrelated Apps'):
+        install(area, commit=refuse)
+    assert installer.owned_addon(area.mod / 'CADWiz', original['installation_id'])
+    assert (area.data / 'install.json').read_bytes() == receipt
+
+
+def test_wizard_registration_is_undone_if_receipt_cannot_commit(area, monkeypatch):
+    first = install(area); state = []
+    original = installer.write_json
+    def write(path, value):
+        if Path(path) == area.data / 'install.json': raise OSError('fixture receipt')
+        return original(path, value)
+    def commit(_):
+        state.append('registered')
+        return lambda: state.clear()
+    monkeypatch.setattr(installer, 'write_json', write)
+    with pytest.raises(OSError, match='fixture receipt'): install(area, commit=commit)
+    assert state == []
+    assert installer.owned_addon(area.mod / 'CADWiz', first['installation_id'])
+
+
+def test_addon_manager_nested_installation_is_backed_up(area):
+    target = area.mod / 'CADWiz'; target.mkdir(parents=True)
+    shutil.copytree(area.source, target / 'CADWiz')
+    (target / 'owner-model.FCStd').write_bytes(b'owner fixture')
+    receipt = install(area)
+    assert (Path(receipt['backup']) / 'owner-model.FCStd').read_bytes() == b'owner fixture'
+    assert (Path(receipt['backup']) / 'CADWiz/important.txt').is_file()

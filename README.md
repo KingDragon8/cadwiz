@@ -57,7 +57,7 @@ available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**Beta 0.8.9.** Includes the [Windows installer repair](docs/RELEASE-NOTES-0.8.9.md)
+**Beta 0.9.0.** Adds a graphical Windows Setup.exe with verified installation and recovery. See [0.9.0 changes](docs/RELEASE-NOTES-0.9.0.md)
 and the Free AIWiz features from 0.8.8.
 
 - **Works:** seeing and measuring your model; building and editing parts as
@@ -90,7 +90,7 @@ Linux x64 with FreeCAD Python 3.11.
 
 
 1. Follow the illustrated guide at [cadwiz.app/download](https://cadwiz.app/download).
-2. Install CADWiz through FreeCAD Addon Manager using its custom repository source, then restart FreeCAD.
+2. On Windows, download and open **CADWiz Setup.exe**, confirm the detected FreeCAD, then click **Install CADWiz**. On macOS/Linux, use the Addon Manager instructions on the download page.
 3. Choose **Add to Claude** or **Connect ChatGPT / Codex** in CADWiz; ask your desktop assistant what's open in FreeCAD.
 
 Windows is checked in isolation. Mac helper bundles are included but real-device installation is unverified. Offline helpers target FreeCAD Python 3.11. No paid service is called by installation tests.
@@ -99,7 +99,7 @@ Windows is checked in isolation. Mac helper bundles are included but real-device
 
 ### Manual installation
 
-**Windows (recommended):**
+**Windows ZIP (advanced alternative):**
 1. Download the latest `cadwiz-<version>.zip` from
    [cadwiz.app/download](https://cadwiz.app/download) and unzip it.
 2. Close FreeCAD, and quit your assistant app fully: right-click its icon by the clock

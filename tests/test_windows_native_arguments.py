@@ -9,7 +9,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-BIN = Path('C:/Program Files/FreeCAD 1.1/bin')
+BIN = Path(os.environ.get('CADWIZ_TEST_FREECAD_BIN', 'C:/Program Files/FreeCAD 1.1/bin'))
 PWSH = Path(shutil.which('pwsh') or str(Path.home() / '.cache/codex-runtimes/codex-primary-runtime/dependencies/native/powershell/pwsh.exe'))
 
 

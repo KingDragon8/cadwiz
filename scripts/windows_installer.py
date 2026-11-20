@@ -115,9 +115,13 @@ def owned_addon(path, installation_id=None):
     if installation_id is not None:
         return False
     # Recognize the actual legacy public add-on without executing its startup.
-    init = path / 'InitGui.py'
-    return (init.is_file() and (path / 'src/integrations/cadwiz_plugin/addon.py').is_file()
-            and 'integrations.cadwiz_plugin.addon' in init.read_text(encoding='utf8', errors='replace'))
+    for candidate in (path, path / 'CADWiz'):
+        init = candidate / 'InitGui.py'
+        if (not linked(candidate) and init.is_file() and
+                (candidate / 'src/integrations/cadwiz_plugin/addon.py').is_file() and
+                'integrations.cadwiz_plugin.addon' in init.read_text(encoding='utf8', errors='replace')):
+            return True
+    return False
 
 
 def running_freecad():
@@ -161,7 +165,8 @@ def check_helper(addon):
     with tempfile.TemporaryDirectory(prefix='cadwiz-offline-check-') as temp:
         env = dict(os.environ, CADWIZ_SETUP_DIR=temp, PYTHONUTF8='1')
         result = subprocess.run([sys.executable, str(addon / 'src/integrations/cadwiz_plugin/offline_launcher.py'), '--check'],
-                                env=env, capture_output=True, text=True, encoding='utf8', errors='replace', timeout=180)
+                                env=env, capture_output=True, text=True, encoding='utf8', errors='replace', timeout=180,
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         if result.returncode:
             raise SetupError('The bundled assistant helper could not be verified. No installation was replaced.\n'
                              + (result.stderr or result.stdout)[-1600:])
@@ -177,7 +182,8 @@ def shortcut_stage(specs, stage, helper):
     path = stage / 'shortcuts.json'
     write_json(path, plan)
     result = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-                             str(helper), '-Plan', str(path)], capture_output=True, text=True, timeout=60)
+                             str(helper), '-Plan', str(path)], capture_output=True, text=True, timeout=60,
+                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     if result.returncode or any(not Path(item['stage']).is_file() for item in plan):
         raise SetupError('Windows could not prepare CADWiz shortcuts. No installation was replaced.')
     return [(Path(item['stage']), Path(item['path'])) for item in plan]
@@ -203,7 +209,7 @@ def link_identity(path, identity):
 
 
 def install(source, info, mod, data, specs=(), *, prerequisite=check_helper, make_shortcuts=shortcut_stage,
-            running=running_freecad, replace=os.replace):
+            running=running_freecad, replace=os.replace, commit=None):
     source = absolute(source); data = absolute(data); mod = destination(info, mod)
     if running():
         raise SetupError('FreeCAD is open. Save your work and close FreeCAD before installing. Nothing installed.')
@@ -227,6 +233,9 @@ def install(source, info, mod, data, specs=(), *, prerequisite=check_helper, mak
         raise SetupError('An unrelated setup record exists in DataDir. It was preserved.')
     manager = [('windows_installer.py', Path(__file__)),
                ('uninstall_windows.ps1', Path(__file__).with_name('uninstall_windows.ps1'))]
+    wizard = Path(__file__).with_name('windows_wizard.py')
+    if wizard.is_file():
+        manager.append(('windows_wizard.py', wizard))
     replacements = [(data / name, old.get('managed_files', {}).get(str(data / name))) for name, src in manager]
     replacements += [(absolute(spec['path']), old.get('shortcut_hashes', {}).get(str(absolute(spec['path'])))) for spec in specs]
     legacy = bool(old and old.get('schema') is None and old.get('addon')
@@ -258,7 +267,7 @@ def install(source, info, mod, data, specs=(), *, prerequisite=check_helper, mak
     backup_root.mkdir(exist_ok=True)
     transaction = backup_root / installation_id
     transaction.mkdir()
-    changed_files = []; earlier = None; installed = False
+    changed_files = []; earlier = None; installed = False; undo_commit = None
     try:
         shutil.copytree(source, addon_stage, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.pyo'))
         if source_hashes(addon_stage) != original:
@@ -302,9 +311,15 @@ def install(source, info, mod, data, specs=(), *, prerequisite=check_helper, mak
                    'shortcut_hashes': {str(absolute(spec['path'])): sha(absolute(spec['path'])) for spec in specs}}
         if record_path.exists():
             shutil.copy2(record_path, transaction / 'previous-install.json')
+        if commit is not None:
+            undo_commit = commit(receipt)
         write_json(record_path, receipt)
         return receipt
-    except Exception:
+    except Exception as error:
+        commit_error = None
+        if undo_commit is not None:
+            try: undo_commit()
+            except Exception as failure: commit_error = failure
         for dest, backup, digest in reversed(changed_files):
             if dest.is_file() and not linked(dest) and sha(dest) == digest:
                 if backup:
@@ -315,6 +330,9 @@ def install(source, info, mod, data, specs=(), *, prerequisite=check_helper, mak
             target.rename(transaction / 'failed-new-addon')
         if earlier and earlier.exists() and not target.exists():
             earlier.rename(target)
+        if commit_error is not None:
+            raise SetupError('Installation files were rolled back, but the Windows Apps entry needs support. '
+                             'Recovery copies were kept.') from error
         raise
     finally:
         # Delete only this newly created, verified staging directory outside Mod.
