@@ -329,6 +329,8 @@ def uninstall(data, *, running=running_freecad):
     record = json.loads(path.read_text(encoding='utf-8-sig'))
     if record.get('schema') != 2 or record.get('product') != PRODUCT:
         raise SetupError('This older installation record cannot prove ownership. Nothing removed; use FreeCAD Addon Manager.')
+    if record.get('state') == 'uninstalled':
+        raise SetupError('No CADWiz add-on is installed by this record. Nothing removed.')
     mod = absolute(record['mod_dir']); addon = absolute(record['addon'])
     if mod.name.casefold() != 'mod' or addon != mod / 'CADWiz':
         raise SetupError('Unsafe installation record. Nothing removed.')
@@ -354,7 +356,10 @@ def uninstall(data, *, running=running_freecad):
             link.unlink()
         elif link.exists():
             kept.append(str(link))
-    path.rename(data / ('uninstalled-' + uuid.uuid4().hex + '.json'))
+    shutil.copy2(path, data / ('uninstalled-' + uuid.uuid4().hex + '.json'))
+    # Keep ownership hashes so a later install can safely reuse our manager files.
+    record['state'] = 'uninstalled'
+    write_json(path, record)
     return {'removed_from_freecad': True, 'preserved': kept,
             'message': 'CADWiz removed from FreeCAD. Models, preferences, assistant settings and saved add-on copies were kept.'}
 

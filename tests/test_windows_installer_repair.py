@@ -189,3 +189,15 @@ def test_receipt_failure_restores_existing_installation(area, monkeypatch):
         install(area)
     assert installer.owned_addon(area.mod / 'CADWiz', first['installation_id'])
     assert (area.data / 'install.json').read_bytes() == before
+
+
+def test_reinstall_after_uninstall_reuses_only_verified_manager_files(area):
+    install(area)
+    installer.uninstall(area.data, running=lambda: False)
+    assert json.loads((area.data / 'install.json').read_text())['state'] == 'uninstalled'
+    receipt = install(area)
+    assert installer.owned_addon(area.mod / 'CADWiz', receipt['installation_id'])
+    installer.uninstall(area.data, running=lambda: False)
+    (area.data / 'windows_installer.py').write_text('owner modified manager')
+    with pytest.raises(installer.SetupError, match='preserved'):
+        install(area)
