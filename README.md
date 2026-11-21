@@ -57,7 +57,7 @@ available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**Beta 0.9.0.** Adds a graphical Windows Setup.exe with verified installation and recovery. See [0.9.0 changes](docs/RELEASE-NOTES-0.9.0.md)
+**Beta 0.9.1.** Opens AI Wiz Setup in FreeCAD and separates setup from connection management. See [0.9.1 changes](docs/RELEASE-NOTES-0.9.1.md).
 and the Free AIWiz features from 0.8.8.
 
 - **Works:** seeing and measuring your model; building and editing parts as

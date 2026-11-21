@@ -1,12 +1,12 @@
 ; SPDX-License-Identifier: LGPL-2.1-or-later
 #ifndef AppVersion
-  #define AppVersion "0.9.0"
+  #define AppVersion "0.9.1"
 #endif
 #ifndef SourceRoot
   #define SourceRoot "..\.."
 #endif
 #ifndef OutputPath
-  #define OutputPath "..\..\..\..\outputs\CADWiz-0.9.0-Beta"
+  #define OutputPath "..\..\..\..\outputs\CADWiz-0.9.1-Beta"
 #endif
 [Setup]
 AppId=CADWiz
@@ -41,8 +41,8 @@ VersionInfoVersion={#AppVersion}.0
 WelcomeLabel1=CADWiz for FreeCAD
 WelcomeLabel2=Create, mark and edit your models with your AI assistant.%n%nSetup finds FreeCAD, verifies its add-on folder and keeps recovery copies when upgrading.%n%nSave your work and close FreeCAD before continuing.
 FinishedHeadingLabel=CADWiz is installed
-FinishedLabel=Open FreeCAD to see the CADWiz panel.%n%nIn CADWiz, choose Setup and connect your assistant. The connection is confirmed when your assistant can inspect the open model.
-FinishedLabelNoIcons=Open FreeCAD to see the CADWiz panel.%n%nIn CADWiz, choose Setup and connect your assistant. The connection is confirmed when your assistant can inspect the open model.
+FinishedLabel=Leave Open FreeCAD with CADWiz selected below.%n%nFor a new connection, AI Wiz Setup opens automatically. Choose your AI there and follow the guided connection steps. Sign-in and permissions remain yours to approve.
+FinishedLabelNoIcons=Leave Open FreeCAD with CADWiz selected below.%n%nFor a new connection, AI Wiz Setup opens automatically. Choose your AI there and follow the guided connection steps. Sign-in and permissions remain yours to approve.
 ButtonInstall=Install CADWiz
 
 [Files]

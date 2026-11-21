@@ -547,8 +547,8 @@ class _Panel:
         self.setup = SetupPage(self)
         self.pages.addWidget(self.printing.page)
         self.pages.addWidget(self.setup.page)
-        from integrations.cadwiz_plugin.free_ai import FreeAIPage
-        self.free_ai = FreeAIPage(self)
+        from integrations.cadwiz_plugin.aiwiz import AIWizPage
+        self.free_ai = AIWizPage(self)
         self.pages.addWidget(self.free_ai.page)
         column.addWidget(self.pages, 1)
         self.strip = self._build_strip()
@@ -575,6 +575,9 @@ class _Panel:
         self.slow.start()
         content.installEventFilter(_ActivityFilter.make(QtCore, self))
         self.refresh()
+
+        # Shared Windows/macOS/Linux first-run destination; never starts another GUI.
+        self.open_page(3)
 
     # ---- shared state ---------------------------------------------------------------------
     def bridge(self) -> Any:
@@ -722,7 +725,7 @@ class _Panel:
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(6)
         self.page_buttons = []
-        for index, name in enumerate(("Creating", "Printing", "Setup", "Free AIWiz")):
+        for index, name in enumerate(("Creating", "Printing", "Setup", "AIWiz")):
             button = QtWidgets.QPushButton(name, bar)
             button.setObjectName(f"CADWiz_Page_{name}")
             button.setProperty("role", "page")

@@ -126,13 +126,13 @@ class FreeAIPage:
             column.addWidget(item)
             return item
 
-        cap = label("CADWIZ  /  FREE AIWiz™")
+        cap = label("CADWIZ  /  AIWiz")
         cap.setStyleSheet("color: #426a91; font-size: 12px; font-weight: 700;")
-        title = label("Create with free AI")
+        title = label("AI Wiz Management")
         title.setProperty("role", "heading")
         title.setStyleSheet("color: #174a78; font-size: 27px; font-weight: 700;")
-        label("BETA TRIAL")
-        label("Start with one free account. Add more supported providers to make the most of available free AI resources.")
+        label("Desktop connections and provider accounts")
+        label("Manage your accounts and preferred order. API enrollment checks access only; direct CAD requests and automatic switching are not enabled in this release.")
         self.overview = label("")
         status = self.overview
         status.setStyleSheet("background: #e5eef9; color: #234d77; border-radius: 8px; padding: 12px;")
@@ -140,7 +140,7 @@ class FreeAIPage:
         self.capacity = label(capacity_label())
         self.direct = label("Direct provider: not connected. Start with one free account.")
         # Keep detailed diagnostics available to support/tests, off the basic page.
-        self.apps.hide()
+        self.apps.show()
         self.capacity.hide()
         self.direct.hide()
         action_holder=qt.QWidget(inner)
@@ -153,7 +153,7 @@ class FreeAIPage:
         action_layout.addWidget(enroll)
         connect = qt.QPushButton("Connect assistant", inner)
         connect.setObjectName("CADWiz_Free_AI_Connect")
-        connect.clicked.connect(lambda: panel.open_page(2))
+        connect.clicked.connect(lambda: (panel.open_page(3), panel.free_ai.page.setCurrentIndex(0)))
         action_layout.addWidget(connect)
         create = qt.QPushButton("Start creating", inner)
         create.setObjectName("CADWiz_Free_AI_Create")
@@ -199,7 +199,7 @@ class FreeAIPage:
             connection.setWordWrap(True)
             box.addWidget(connection)
             connection.hide()
-            indicator=qt.QCheckBox("Connected",card)
+            indicator=qt.QCheckBox("API access checked",card)
             indicator.setEnabled(False)
             indicator.setObjectName('CADWiz_Free_AI_Connected_'+provider.id)
             account_row.addWidget(indicator)
@@ -313,7 +313,7 @@ class FreeAIPage:
             self.overview.setText("Provider status needs recovery. Existing account settings were preserved.")
             return
         connected=sum(row.get('connected')is True for row in state['providers'].values())
-        self.overview.setText(f"{len(PROVIDERS)} providers  ·  {connected} connected\nArrange your preferred order below.")
+        self.overview.setText(f"{len(PROVIDERS)} providers  ·  {connected} API credentials checked\nPreferred order saved below. Automatic switching: unavailable.")
         order=state.get('queue',[p.id for p in PROVIDERS])
         columns=2 if self.page.viewport().width()>=720 else 1
         key=(tuple(order),columns)
@@ -337,7 +337,7 @@ class FreeAIPage:
             events=[e for e in state['events']if e.get('provider')==provider.id and e.get('event')=='request']
             today=__import__('time').time()-86400
             recent=sum(e.get('at',0)>=today for e in events)
-            usage.setText(f"{recent} AI requests from CADWiz in the last 24 hours"if recent else "Usage starts with your first AI request")
+            usage.setText(f"{recent} AI requests from CADWiz in the last 24 hours"if recent else "Remaining allowance: not reported. Direct CAD requests are disabled.")
             max_count=max(1,max((sum(e.get('provider')==p.id and e.get('event')=='request'and e.get('at',0)>=today
                                     for e in state['events'])for p in PROVIDERS),default=1))
             bar.setRange(0,max_count)
