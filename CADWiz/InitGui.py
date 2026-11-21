@@ -8,7 +8,7 @@ lives inside _start().
 """
 
 
-def _start() -> None:
+def _start(startup_file=None) -> None:
     import sys
     import traceback
     from pathlib import Path
@@ -16,16 +16,24 @@ def _start() -> None:
     import FreeCAD
 
     def addon_folder() -> Path:
-        # FreeCAD does not tell this file where it lives, and the two ways of
-        # installing put the code at different depths: the installer at Mod/CADWiz,
-        # the Addon Manager at Mod/CADWiz/CADWiz.
+        # Prefer the file actually executed; never silently import another copy.
+        if startup_file:
+            local = Path(startup_file).resolve().parent
+            if (local / 'src/integrations/cadwiz_plugin/addon.py').is_file():
+                return local
         mod = Path(FreeCAD.getUserAppDataDir()) / "Mod"
-        candidates = [mod / "CADWiz" / "CADWiz", mod / "CADWiz"]
-        candidates += sorted(p.parents[2] for p in mod.glob("*/CADWiz/src/integrations/cadwiz_plugin"))
-        for candidate in candidates:
-            if (candidate / "src" / "integrations" / "cadwiz_plugin").is_dir():
-                return candidate
-        raise FileNotFoundError(f"the CADWiz code (src/integrations/cadwiz_plugin) was not found under {mod}")
+        candidates = []
+        for folder in mod.iterdir() if mod.is_dir() else []:
+            if folder.name.casefold() not in ('cadwiz', 'ai-freecad') or folder.is_symlink():
+                continue
+            for relative in ('src/integrations/cadwiz_plugin/addon.py',
+                             'CADWiz/src/integrations/cadwiz_plugin/addon.py',
+                             '*/CADWiz/src/integrations/cadwiz_plugin/addon.py'):
+                candidates.extend(p.parents[3] for p in folder.glob(relative))
+        candidates = list(dict.fromkeys(candidates))
+        if len(candidates) == 1:
+            return candidates[0]
+        raise FileNotFoundError(f"CADWiz source candidates under {mod}: {len(candidates)}. Run Check Installation; repair from the release ZIP with FreeCAD closed.")
 
     try:
         source = str(addon_folder() / "src")
@@ -38,4 +46,4 @@ def _start() -> None:
         FreeCAD.Console.PrintError("CADWiz could not start:\n" + traceback.format_exc())
 
 
-_start()
+_start(locals().get('__file__') or globals().get('__file__'))

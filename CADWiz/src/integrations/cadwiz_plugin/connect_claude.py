@@ -35,8 +35,8 @@ APPS = {
     # the desktop app, not the coding tool's own claude.exe (which lives under claude-code)
     "claude": {"name": "Claude Desktop", "process": "claude", "not_path": "*claude-code*", "start": "Claude",
                "download": "claude.ai/download", "where": "Settings, Connectors"},
-    "chatgpt": {"name": "the ChatGPT app", "process": "ChatGPT", "not_path": "", "start": "ChatGPT",
-                "download": "chatgpt.com/download", "where": "Settings, MCP servers"},
+    "chatgpt": {"name": "Codex", "process": "Codex", "not_path": "", "start": "Codex",
+                "download": "developers.openai.com/codex/app/", "where": "Settings, MCP servers"},
 }
 FIND_APP = (
     "$p = Get-Process -Name {process} -ErrorAction SilentlyContinue | Where-Object {{ $_.Path {path_filter} }}; "
@@ -67,7 +67,15 @@ SAY = {stage: say(stage) for stage in ("checking", "opening", "waiting", "connec
 def ask_windows(app: str = "claude", timeout: float = 8.0) -> dict[str, Any]:
     """Is the app running, and how to open it (its Start-menu id)."""
     spec = APPS[app]
-    script = FIND_APP.format(process=spec["process"], start=spec["start"],
+    if app == "chatgpt":
+        # Historical wire key stays compatible. Match Codex identity, not an unrelated
+        # ChatGPT install; some Codex packages still display ChatGPT in Start.
+        script = ("$p = Get-Process -Name Codex,ChatGPT -ErrorAction SilentlyContinue | "
+                  "Where-Object { $_.ProcessName -eq 'Codex' -or $_.Path -like '*OpenAI.Codex*' }; "
+                  "$a = Get-StartApps | Where-Object { $_.Name -eq 'Codex' -or $_.AppID -like 'OpenAI.Codex*!*' } | Select-Object -First 1; "
+                  "Write-Output ('running=' + [bool]$p); Write-Output ('appid=' + $a.AppID)")
+    else:
+        script = FIND_APP.format(process=spec["process"], start=spec["start"],
                              path_filter=f"-and $_.Path -notlike '{spec['not_path']}'" if spec["not_path"] else "")
     done = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True,
                           timeout=timeout, creationflags=NO_WINDOW)

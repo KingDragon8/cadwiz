@@ -1,4 +1,6 @@
 @echo off
 rem Double-click to install CADWiz. Close FreeCAD and Claude Desktop first.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install_windows.ps1" %*
-pause
+set "CADWizExit=%ERRORLEVEL%"
+if not defined CADWIZ_NO_PAUSE pause
+exit /b %CADWizExit%

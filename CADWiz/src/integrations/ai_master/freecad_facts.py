@@ -25,6 +25,11 @@ def _objects(document: Any, names: Iterable[str] | None) -> list[Any]:
     if names:
         wanted = set(names)
         objects = [o for o in objects if getattr(o, "Name", "") in wanted or getattr(o, "Label", "") in wanted]
+    else:
+        from integrations.ai_master.parametric_checks import final_shapes
+        finished = set(final_shapes(document))
+        if finished:
+            objects = [o for o in objects if o.Name in finished]
     return objects
 
 
@@ -55,7 +60,12 @@ def _holes(shape: Any) -> list[dict[str, float]]:
             # a full cylinder of its bounding height would need for an outer wall.
             box = face.BoundBox
             height = max(box.XLength, box.YLength, box.ZLength)
-            key = round(radius, 2)
+            if str(getattr(face, "Orientation", "")) != "Reversed":
+                continue
+            axis = surface.Axis
+            center = surface.Center
+            offset = center - axis * center.dot(axis)
+            key = (round(radius, 3), *(round(v, 3) for v in (offset.x, offset.y, offset.z, axis.x, axis.y, axis.z)))
             if key in seen:
                 continue
             seen.add(key)
@@ -141,7 +151,11 @@ def measure_document(document: Any, *, object_name: str = "", subject_names: Ite
         for prop in getattr(obj, "PropertiesList", []) or []:
             if str(prop).startswith("P_") or str(getattr(obj, "getGroupOfProperty", lambda p: "")(prop)) == "Design":
                 names.append(str(prop)[2:] if str(prop).startswith("P_") else str(prop))
-    facts.parameter_names = sorted(set(names))
+    from integrations.ai_master.parametric_checks import native_evidence
+
+    evidence = native_evidence(document)
+    facts.parameter_names = evidence["parameter_names"]
+    facts.feature_tree.update({k: evidence[k] for k in ("functional_tree", "linked_parameters", "verified_parameters")})
     facts.feature_tree["named_parameters"] = len(facts.parameter_names)
     facts.living_design_verified = living_design_verified
     for obj in all_objects:

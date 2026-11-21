@@ -137,11 +137,18 @@ def register() -> Any:
         def GetClassName(self) -> str:
             return "Gui::PythonWorkbench"
 
-    _workbench = CADWizWorkbench()
-    gui.addWorkbench(_workbench)
+    workbench = CADWizWorkbench()
+    gui.addWorkbench(workbench)
+    _workbench = workbench
     # Runtime discovery and private helper verification never delay the window.
-    from integrations.cadwiz_plugin.setup_startup import start as check_setup
-    check_setup(import_module("FreeCAD"))
-    start_bridge()
+    try:
+        from integrations.cadwiz_plugin.setup_startup import start as check_setup
+        check_setup(import_module("FreeCAD"))
+    except Exception as error:
+        print(f"CADWiz: optional setup check failed; workbench remains available: {error}")
+    try:
+        start_bridge()
+    except Exception as error:
+        print(f"CADWiz: optional assistant connection failed; workbench remains available: {error}")
     _schedule_panel_at_startup()
     return _workbench

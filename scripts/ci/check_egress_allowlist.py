@@ -32,6 +32,7 @@ ALLOWLIST = ROOT / "config" / "egress_allowlist.toml"
 _NETWORK_CALLS = frozenset(
     {
         "urlopen",
+        "build_opener",
         "urlretrieve",
         "socket",
         "create_connection",

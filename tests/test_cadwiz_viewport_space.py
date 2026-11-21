@@ -15,9 +15,10 @@ def make_host(view_width, dock_width):
     mdi = SimpleNamespace(width=lambda: view_width, height=lambda: 800,
                           setMinimumSize=lambda w,h: minima.append((w,h)))
     host = PanelHost.__new__(PanelHost)
-    host.window = SimpleNamespace(width=lambda: 1846, findChild=lambda cls: mdi)
+    host.window = SimpleNamespace(width=lambda: 1846, findChild=lambda cls: mdi, dockWidgetArea=lambda dock: 2)
     host.QtWidgets = SimpleNamespace(QMdiArea=object)
-    host.QtCore = SimpleNamespace(QTimer=SimpleNamespace(singleShot=lambda delay, work: scheduled.append(work)))
+    host.QtCore = SimpleNamespace(Qt=SimpleNamespace(TopDockWidgetArea=4, BottomDockWidgetArea=8, RightDockWidgetArea=2),
+                                  QTimer=SimpleNamespace(singleShot=lambda delay, work: scheduled.append(work)))
     host.dock = SimpleNamespace(isFloating=lambda: False,width=lambda: dock_width)
     host.collapsed = False
     host.settings = {}

@@ -35,7 +35,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Callable
 
-from ai_freecad_core.ai_master.flags import read_settings
+from ai_freecad_core.ai_master.flags import read_settings, write_setting
 from ai_freecad_core.ai_master.project_store import Project
 from ai_freecad_core.ai_master.units import both
 from ai_freecad_core.conversation.founder_words import PLAIN_ERROR, clean_reply
@@ -52,7 +52,7 @@ TOOL_NAMES = ("inspect_document", "measure", "render", "build_model", "edit_obje
               # ORDER-2026-10-18-02 B: mesh and Blender
               "import_mesh", "mesh_edit", "swap_part", "repair_mesh",
               # ORDER-2026-10-19-06: technical drawings (founder ruling 2026-10-19)
-              "drawing")
+              "drawing", "model_health", "construction_visibility")
 
 
 class PlainError(Exception):
@@ -91,11 +91,15 @@ class PluginSession:
                  log_path: str | Path | None = None, section_runner: Callable[..., dict] | None = None) -> None:
         self.app = app if app is not None else import_module("FreeCAD")
         self.gui = gui
+        if project_root is None:
+            from integrations.cadwiz_plugin.preferences_store import load
+            project_root = load().project_folder or None
         self.project = Project.open(PROJECT_NAME, root=project_root)
         self._factory = executor_factory or _adopted_executor
         self._pump = pump
         self._executors: dict[str, Any] = {}
         self.log_path = Path(log_path) if log_path else plugin_data_dir() / "tool-calls.jsonl"
+        self.register_project_root(self.project.folder)
         self._section_runner = section_runner
         #: What the slim panel shows: the document and object being worked on, its
         #: version, its key measurements, the last change in one line, and the
@@ -188,17 +192,25 @@ class PluginSession:
         if not file_name:
             folder = self.project.folder / "documents"
             folder.mkdir(parents=True, exist_ok=True)
-            file_name = str(folder / f"{document.Label or document.Name}.FCStd")
+            from ai_freecad_core.ai_master.project_store import safe_name
+            base = safe_name(document.Label or document.Name)
+            path = folder / f"{base}.FCStd"
+            suffix = 2
+            while path.exists():
+                path = folder / f"{base}_{suffix}.FCStd"
+                suffix += 1
+            file_name = str(path)
             document.saveAs(file_name)
         return file_name
 
-    def _executor(self, document: Any) -> Any:
+    def _executor(self, document: Any, *, adopt: bool = True) -> Any:
         file_name = self._file_of(document)
         key = str(Path(file_name).resolve()).casefold()
         executor = self._executors.get(key)
         if executor is None:
             label = str(getattr(document, "Label", "") or Path(file_name).stem)
-            executor = self._factory(self.project, label, file_name, pump=self._pump,
+            project = self._project_for(file_name)
+            executor = self._factory(project, label, file_name, pump=self._pump,
                                      snapshot_open=lambda dest, doc_name=document.Name: self._snapshot(doc_name, file_name, dest),
                                      reload=self._reload, current_view=self._capture_view)
             self._executors[key] = executor
@@ -211,11 +223,38 @@ class PluginSession:
                 # A backup of a model that is already broken is recorded as broken,
                 # so the time slider can mark it red (ORDER-2026-10-18-01).
                 executor.store.health_probe = lambda _path, name=document.Name: self._broken_objects(name)
-        if not getattr(executor, "adoption", None):
+        if adopt and not getattr(executor, "adoption", None):
             executor.adopt()
             executor.adopted_at_version = executor.store.latest()
         self.state.update(document=str(getattr(document, "Label", "")), file=file_name, object=str((executor.adoption or {}).get("main_object", "")))
         return executor
+
+    def register_project_root(self, folder: Path) -> None:
+        """Remember old stores when the user changes where new projects are saved."""
+        from integrations.cadwiz_plugin.install_setup import atomic_write
+        path = self.log_path.parent / "project-roots.json"
+        roots = []
+        with contextlib.suppress(OSError, ValueError, AttributeError):
+            roots = json.loads(path.read_text(encoding="utf-8")).get("roots", [])
+        roots = roots if isinstance(roots, list) else []
+        roots = [p for p in roots if isinstance(p, str) and Path(p).is_absolute()]
+        roots = list(dict.fromkeys([str(folder.resolve()), *roots]))[:50]
+        atomic_write(path, json.dumps({"roots": roots}, indent=1))
+
+    def _project_for(self, file_name: str) -> Project:
+        """Keep an existing model's older version store without moving any files."""
+        import hashlib
+        file_key = hashlib.sha256(str(Path(file_name).resolve()).casefold().encode("utf-8")).hexdigest()[:12]
+        legacy = Path.home() / "CADWiz Projects" / PROJECT_NAME
+        roots = []
+        with contextlib.suppress(OSError, ValueError, AttributeError):
+            roots = json.loads((self.log_path.parent / "project-roots.json").read_text(encoding="utf-8")).get("roots", [])
+        roots = roots if isinstance(roots, list) else []
+        folders = [self.project.folder, legacy, *(Path(p) for p in roots if isinstance(p, str) and Path(p).is_absolute())]
+        for folder in dict.fromkeys(folders):
+            if folder.is_dir() and any((folder / "objects").glob(f"*/adopted/{file_key}")):
+                return self.project if folder == self.project.folder else Project(folder)
+        return self.project
 
     def _broken_objects(self, document_name: str) -> list[str]:
         from integrations.cadwiz_plugin.view_link import broken_objects
@@ -243,7 +282,7 @@ class PluginSession:
         file_key = hashlib.sha256(str(Path(file_name).resolve()).casefold().encode("utf-8")).hexdigest()[:12]
         from ai_freecad_core.ai_master.project_store import safe_name
 
-        folder = self.project.folder / "objects" / safe_name(label) / "adopted" / file_key
+        folder = self._project_for(file_name).folder / "objects" / safe_name(label) / "adopted" / file_key
         if not folder.is_dir():
             return None
         return AdoptedStore(folder, file_name)
@@ -304,11 +343,15 @@ class PluginSession:
     def _after_change(self, executor: Any, outcome: dict[str, Any]) -> dict[str, Any]:
         if not outcome.get("success", True) and outcome.get("error"):
             error = str(outcome.get("error"))
+            if outcome.get("health"):
+                return {"ok": False, "health": outcome["health"], "detail_for_claude": error,
+                        "say_to_founder": "The result did not pass its editable-model or dimension checks. I kept the previous model; the construction needs correction."}
             line = outcome.get("error_line")
             raise _ScriptFailed(error + (f" (line {line})" if line else ""))
         state = executor.current_state() if hasattr(executor, "current_state") else {}
         self.state.update(version=int(state.get("version") or 0), last_change=str(outcome.get("diff") or state.get("diff") or ""),
-                          measurements=str(outcome.get("measurements") or ""))
+                          measurements=str(outcome.get("measurements") or ""),
+                          editability=str(outcome.get("editability") or "") + (" — limitation: " + str(outcome["limitation"]) if outcome.get("limitation") else ""), health=outcome.get("health") or {})
         self._remember_picture(outcome.get("images"))
         return outcome
 
@@ -357,10 +400,30 @@ class PluginSession:
     def _render(self, views: list[str] | None = None, section: bool = False, current_view: bool = True,
                 object: str | None = None, document: str | None = None) -> dict[str, Any]:  # noqa: A002
         target = self._document(document)
+        # A live-only request must not adopt/render a large assembly in a worker.
+        # Check both GUI and application identities before capturing another MDI view.
+        gui_doc = getattr(self.gui, "ActiveDocument", None)
+        shown_doc = getattr(gui_doc, "Document", None)
+        active_doc = getattr(self.app, "ActiveDocument", None)
+        live_matches = (shown_doc is not None and active_doc is not None
+                        and getattr(shown_doc, "Name", None) == target.Name
+                        and getattr(active_doc, "Name", None) == target.Name)
+        if current_view and not views and not section and not object and live_matches:
+            folder = self.project.folder / "renders"
+            folder.mkdir(parents=True, exist_ok=True)
+            view = self._capture_view(str(folder / f"current_view_{time.time_ns()}.png"))
+            if view:
+                self._remember_picture([view])
+                store = self.store_for(target)
+                return {"images": [view], "captions": ["Live FreeCAD viewport"],
+                        "document": target.Name, "file": str(getattr(target, "FileName", "")),
+                        "version": store.latest() if store is not None else 0,
+                        "presentation_note": "Current native viewport; geometry has not been independently rendered."}
         executor = self._executor(target)
         images = list(executor.render(list(views or ["iso"]), bool(section)).get("images") or [])
         self._remember_picture(images)
-        if current_view:
+        view = ""
+        if current_view and live_matches:
             view = self._capture_view(str(self.project.folder / "renders" / f"current_view_{int(time.time())}.png"))
             if view:
                 images.insert(0, view)
@@ -392,6 +455,7 @@ class PluginSession:
             document = created.Name
         target = self._document(document)
         executor = self._executor(target)
+        executor.require_parametric = True
         return self._after_change(executor, executor.edit_existing(code, note or "built by Claude"))
 
     def _edit_object(self, object: str | None = None, parameters: dict[str, Any] | None = None, script: str | None = None,  # noqa: A002
@@ -522,7 +586,9 @@ class PluginSession:
             document = next((d for d in self.app.listDocuments().values()
                              if getattr(d, "FileName", "") and Path(d.FileName).resolve() == Path(path).resolve()), None)
             if document is None:
-                raise PlainError("FreeCAD could not open that document.")
+                # Some FreeCAD builds do not route native FCStd files through
+                # Gui.open. Use the native loader in this same application.
+                document = self.app.openDocument(str(path))
         else:
             document = existing or self.app.openDocument(str(path))
         with contextlib.suppress(Exception):
@@ -546,20 +612,52 @@ class PluginSession:
             return {"saved": str(path)}
         if current and Path(current).exists():
             # His file is about to change: its prior state becomes a version first.
-            executor = self._executor(target)
+            executor = self._executor(target, adopt=False)
             if not executor.store.backed_up_this_session:
                 executor.store.backup(lambda dest: shutil.copyfile(current, dest), note="before saving")
         target.save() if current else self._file_of(target)
         return {"saved": str(getattr(target, "FileName", "") or "")}
+
+    def _model_health(self, document: str | None = None) -> dict[str, Any]:
+        target = self._document(document)
+        folder = Path(tempfile.mkdtemp(prefix="health-", dir=str(self.project.folder)))
+        snapshot = folder / "snapshot.FCStd"
+        if hasattr(target, "saveCopy"):
+            target.saveCopy(str(snapshot))
+        else:
+            shutil.copyfile(str(target.FileName), snapshot)
+        from integrations.ai_master.executor import AIMasterExecutor
+        worker = AIMasterExecutor(self.project, "Health check", pump=self._pump)
+        result = worker._run_worker({"action": "health", "source_path": str(snapshot),
+                                     "result_path_fcstd": str(folder / "checked.FCStd"), "project_dir": str(self.project.folder)})
+        if not result.get("ok"):
+            raise PlainError("The model health check could not finish; your model was not changed.")
+        self.state.update(health=result["health"], editability=result["health"]["level"], document=target.Label, file=str(target.FileName))
+        return {"health": result["health"], "checked_copy_only": True}
+
+    def _construction_visibility(self, show: bool = False, document: str | None = None) -> dict[str, Any]:
+        from integrations.ai_master.parametric_checks import STATUS, present
+        target = self._document(document)
+        status = target.getObject(STATUS)
+        if status is not None and hasattr(status, "ConstructionVisible"):
+            status.ConstructionVisible = bool(show)
+            if not show:
+                status.VisibleReferences = "[]"
+        present(target, created=True, show=show)
+        if self.gui is not None:
+            with contextlib.suppress(Exception):
+                self.gui.activeDocument().activeView().setAxisCross(bool(show))
+        return {"construction_visible": bool(show), "note": "Reference objects were shown or hidden; none were deleted. Save the document to keep this display choice."}
 
     def _design_record(self, action: str = "get", fields: dict[str, Any] | None = None, document: str | None = None) -> dict[str, Any]:
         from ai_freecad_core.ai_master.design_contract import update_contract
 
         executor = self._executor(self._document(document))
         if action == "update":
-            contract = update_contract(self.project, executor.object_name, dict(fields or {}), str((fields or {}).get("founder_words", "")))
+            project = getattr(executor, "project", self.project)
+            contract = update_contract(project, executor.object_name, dict(fields or {}), str((fields or {}).get("founder_words", "")))
             return {"contract": contract.to_dict()}
-        contract = self.project.contract()
+        contract = getattr(executor, "project", self.project).contract()
         return {"contract": contract.to_dict() if contract else None}
 
     def _contract_check(self, document: str | None = None) -> dict[str, Any]:
@@ -1266,6 +1364,12 @@ def show_and_frame(gui: Any, document: Any, shown: set[str]) -> None:
     if view is None:
         return
     with contextlib.suppress(Exception):
+        from integrations.ai_master.parametric_checks import STATUS, present
+        status = document.getObject(STATUS)
+        present(document)
+        if status is not None:
+            view.setAxisCross(bool(getattr(status, "ConstructionVisible", False)))
+    with contextlib.suppress(Exception):
         view.viewIsometric()
     with contextlib.suppress(Exception):
         view.fitAll()
@@ -1287,3 +1391,27 @@ def _adopted_executor(project: Any, name: str, file_name: str, **hooks: Any) -> 
 
     return AdoptedExecutor(project, name, file_name, pump=hooks.get("pump"), snapshot_open=hooks.get("snapshot_open"),
                            reload=hooks.get("reload"), current_view=hooks.get("current_view"))
+
+
+def listed_cad_folders() -> list[str]:
+    """The folders he added himself (Setup > Folders CADWiz may open)."""
+    return [str(p) for p in (read_settings().get("cad_folders") or []) if str(p).strip()]
+
+
+def add_cad_folder(folder: str | Path) -> list[str]:
+    """Let CADWiz open, save and export in this folder too (beta 1.0 report E-4:
+    `C:\\00 Cooloff` was refused and there was no way to allow it). His choice, made
+    on the Setup page; never added by Claude."""
+    path = str(Path(folder).resolve())
+    folders = listed_cad_folders()
+    if not any(Path(f).resolve() == Path(path) for f in folders):
+        folders.append(path)
+        write_setting("cad_folders", folders)
+    return folders
+
+
+def remove_cad_folder(folder: str | Path) -> list[str]:
+    target = Path(folder).resolve()
+    folders = [f for f in listed_cad_folders() if Path(f).resolve() != target]
+    write_setting("cad_folders", folders)
+    return folders

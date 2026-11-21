@@ -10,7 +10,7 @@ def connect(panel) -> None:
     qt = panel.QtWidgets
     app = str(getattr(panel.prefs, "ai_app", "claude"))
     if app == "auto":
-        app, ok = qt.QInputDialog.getItem(panel.content, "Connect CADWiz", "Which desktop assistant?", ["Claude Desktop", "ChatGPT / Codex desktop"], 0, False)
+        app, ok = qt.QInputDialog.getItem(panel.content, "Connect CADWiz", "Which desktop assistant?", ["Claude Desktop", "OpenAI / Codex"], 0, False)
         if not ok:
             return
         app = "claude" if app.startswith("Claude") else "chatgpt"
@@ -40,17 +40,17 @@ def connect(panel) -> None:
             path = setup.config_path()
             existing = tomllib.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
             if existing.get("mcp_servers", {}).get("cadwiz") == values:
-                from .connect_claude import Connector
-                panel.connector = Connector(app="chatgpt")
+                qt.QMessageBox.information(panel.content, "Codex connection configured", "Open Codex and ask: What’s open in FreeCAD? If it was already open, fully quit and reopen it to load the CADWiz connection. Your existing configuration was kept.")
                 return
-            text = ("CADWiz will update only its own entry in:\n" + str(setup.config_path()) +
-                    "\n\nA backup is saved first. Undo connection restores CADWiz's previous entry while keeping other changes.\n\n" +
-                    setup.entry(info) + "\nFor manual setup: Settings → MCP servers → Add server. Name: cadwiz. Type: STDIO.\n" + json.dumps(values, indent=2))
-            answer = qt.QMessageBox.question(panel.content, "Connect ChatGPT / Codex desktop", text, qt.QMessageBox.Yes | qt.QMessageBox.No)
+            text = ("Add CADWiz to Codex on this computer?\n\n"
+                    "Only CADWiz’s own connection settings will change. A backup and Undo connection are included. "
+                    "Other assistant settings and your models are kept.\n\n"
+                    "After approving, fully quit and reopen Codex, then ask what is open in FreeCAD.")
+            answer = qt.QMessageBox.question(panel.content, "Connect Codex", text, qt.QMessageBox.Yes | qt.QMessageBox.No)
             if answer != qt.QMessageBox.Yes:
                 return
             setup.connect(info)
-            qt.QMessageBox.information(panel.content, "Connection saved", "Fully quit and reopen ChatGPT / Codex desktop, then ask: What's open in FreeCAD? The light turns green after that assistant checks in.")
+            qt.QMessageBox.information(panel.content, "Connection saved", "Fully quit and reopen Codex, then ask: What's open in FreeCAD? The light turns green after that assistant checks in.")
     except Exception as error:
         qt.QMessageBox.warning(panel.content, "CADWiz connection", str(error))
 

@@ -105,9 +105,10 @@ def assess_editability(facts: FactReport, contract: DesignContract | None) -> Ed
     )
     evidence = EditabilityEvidence(
         mesh_only=facts.mesh_only, valid_solid=facts.valid_solid,
-        native_feature_tree=bool(facts.feature_tree.get("bodies") or facts.feature_tree.get("sketches") or facts.feature_tree.get("features")),
+        native_feature_tree=bool(facts.feature_tree.get("functional_tree", 0)),
         named_parameters=int(facts.feature_tree.get("named_parameters", len(facts.parameter_names))),
         recognisable_parameter_names=names_match, living_design_verified=facts.living_design_verified,
+        parameter_change_verified=bool(facts.feature_tree.get("verified_parameters", 0)),
     )
     return assess(evidence, build_path=contract.build_path if contract else "mechanical")
 

@@ -33,7 +33,8 @@ def load(path: Path | None = None) -> FounderPreferences:
 def save(preferences: FounderPreferences, path: Path | None = None) -> Path:
     target = path or preferences_path()
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(preferences.to_dict(), indent=1), encoding="utf-8")
+    from integrations.cadwiz_plugin.install_setup import atomic_write
+    atomic_write(target, json.dumps(preferences.to_dict(), indent=1))
     return target
 
 

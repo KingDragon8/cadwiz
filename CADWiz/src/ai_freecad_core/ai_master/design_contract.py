@@ -81,6 +81,7 @@ class DesignContract:
     requirements: list[Requirement] = field(default_factory=list)
     editability_commitments: list[str] = field(default_factory=list)  # parameter names that must stay named and editable
     build_path: str = "mechanical"
+    construction_exception: str = ""
     assumptions: list[str] = field(default_factory=list)       # addendum 4: stated, not asked
     version: int = 1
     authored_by: str = "master"
@@ -98,7 +99,7 @@ class DesignContract:
             "features": list(self.features), "relationships": list(self.relationships),
             "requirements": [r.to_dict() for r in self.requirements],
             "editability_commitments": list(self.editability_commitments),
-            "build_path": self.build_path, "assumptions": list(self.assumptions),
+            "build_path": self.build_path, "construction_exception": self.construction_exception, "assumptions": list(self.assumptions),
             "version": self.version, "authored_by": self.authored_by, "updated_utc": self.updated_utc,
         }
 
@@ -112,6 +113,7 @@ class DesignContract:
             requirements=[Requirement.from_dict(r) for r in data.get("requirements", [])],
             editability_commitments=list(data.get("editability_commitments", [])),
             build_path=str(data.get("build_path", "mechanical")), assumptions=list(data.get("assumptions", [])),
+            construction_exception=str(data.get("construction_exception", "")),
             version=int(data.get("version", 1)), authored_by=str(data.get("authored_by", "master")),
             updated_utc=str(data.get("updated_utc", "")),
         )
@@ -187,6 +189,7 @@ def update_contract(project: Any, object_name: str, args: dict[str, Any], founde
         requirements=requirements,
         editability_commitments=list(args.get("editability_commitments") or (existing.editability_commitments if existing else [])),
         build_path=str(args.get("build_path") or (existing.build_path if existing else "mechanical")),
+        construction_exception=str(args.get("construction_exception", existing.construction_exception if existing else "")),
         assumptions=list(args.get("assumptions") or (existing.assumptions if existing else [])),
     )
     project.contracts.save(contract)

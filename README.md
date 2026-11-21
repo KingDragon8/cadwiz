@@ -41,9 +41,24 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 
 ---
 
+## Offline help and installation checks
+
+Open **Setup → CADWiz Doctor** for read-only checks, or run
+`python CADWiz/src/integrations/cadwiz_plugin/doctor.py` if the workbench cannot load.
+Use **Copy instructions for my assistant** for version-matched help.
+See [the support guide](CADWiz/docs/CADWIZ-SUPPORT.md) and [0.8.8 changes](docs/RELEASE-NOTES-0.8.8.md).
+
+## Free AIWiz beta trial
+
+Open **Free AIWiz** for provider guides, account setup and connection status.
+Secure API-key enrollment is currently Windows-only. Automatic AI generation
+and provider switching are not enabled; existing assistant connections remain
+available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
+
 ## Status
 
-**v0.6.1.**
+**Beta 0.9.2.** Opens AI Wiz Setup in FreeCAD and separates setup from connection management. See [0.9.2 changes](docs/RELEASE-NOTES-0.9.2.md).
+and the Free AIWiz features from 0.8.8.
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;
@@ -75,8 +90,28 @@ Linux x64 with FreeCAD Python 3.11.
 
 
 1. Follow the illustrated guide at [cadwiz.app/download](https://cadwiz.app/download).
-2. Install CADWiz through FreeCAD Addon Manager using its custom repository source, then restart FreeCAD.
+2. On Windows, download and open **CADWiz Setup.exe**, confirm the detected FreeCAD, then click **Install CADWiz**. On macOS/Linux, extract the complete ZIP and use the workbench-only installer described below.
 3. Choose **Add to Claude** or **Connect ChatGPT / Codex** in CADWiz; ask your desktop assistant what's open in FreeCAD.
+
+### 0.9.2 Mac installation and recovery
+
+Save work and quit FreeCAD. Extract the complete ZIP in Downloads, then run
+`Install-CADWiz.command` (or `bash scripts/install_macos.sh` from the extracted
+folder). A custom app can be selected with `FREECAD_APP='/path/FreeCAD.app'`.
+On Linux use `bash scripts/install.sh`; custom runtimes use `FREECAD_PY`.
+The selected FreeCAD supplies the actual user directory. The installer does not
+use Git, pip or assistant configuration, and stops rather than guessing when
+multiple runtimes are found. It preserves previous installs outside Mod and
+prints a rollback manifest. Restart FreeCAD, select CADWiz and confirm its panel;
+repeat the restart twice before considering the repair verified. Configure your
+assistant through AI Wiz Setup afterward. A copied folder is not a startup test.
+
+See [0.9.2 findings, verification gates and rollback](docs/RELEASE-NOTES-0.9.2.md).
+Native Mac CI verified clean install, upgrade, nested recovery, restarts and
+network-denied startup on both case-insensitive and case-sensitive APFS with
+FreeCAD 1.1.4. Windows installer lifecycle and Linux native checks passed.
+Neil's physical Mac and individual assistant account enrollment remain unverified.
+Automatic provider switching is not enabled; API enrollment is separate from CAD execution.
 
 Windows is checked in isolation. Mac helper bundles are included but real-device installation is unverified. Offline helpers target FreeCAD Python 3.11. No paid service is called by installation tests.
 
@@ -84,20 +119,21 @@ Windows is checked in isolation. Mac helper bundles are included but real-device
 
 ### Manual installation
 
-**Windows (recommended):**
+**Windows ZIP (advanced alternative):**
 1. Download the latest `cadwiz-<version>.zip` from
    [cadwiz.app/download](https://cadwiz.app/download) and unzip it.
 2. Close FreeCAD, and quit your assistant app fully: right-click its icon by the clock
    and choose **Quit** (closing its window leaves it running, and it reads CADWiz's
    settings only when it starts).
-3. Double-click **`install_windows.bat`**. If FreeCAD 1.1 isn't installed, it asks
-   whether to open FreeCAD's download page. It never downloads anything by itself.
-   It then copies CADWiz into FreeCAD and connects CADWiz to Claude Desktop and,
-   if you have it, the ChatGPT desktop app, saving a copy of each app's settings first.
-   It adds **CADWiz** to the Start menu (and, if you say yes, to your desktop), and it
-   lists everything it changed.
-4. Click **CADWiz**. It opens FreeCAD with the CADWiz panel, together with your
-   assistant app.
+3. Double-click **`install_windows.bat`** from the fully extracted ZIP. It verifies
+   FreeCAD and its user folder, checks the bundled offline connector, and installs
+   CADWiz with recovery backups. If FreeCAD is missing, follow the displayed
+   official download link. No separate Python, administrator access or pip is needed.
+   It adds **CADWiz** to the Start menu and optionally the desktop. Unknown or
+   duplicate installations are preserved for support to resolve.
+4. Open FreeCAD, then use CADWiz **Setup** to connect your assistant. The installer
+   itself does not modify assistant settings. See the
+   [Windows installation and recovery guide](docs/RELEASE-NOTES-0.8.9.md).
 
 **To remove CADWiz:** Start menu > CADWiz > **Uninstall CADWiz** (or double-click
 `uninstall_windows.bat`). It removes CADWiz, its shortcuts and its entry in your
