@@ -115,7 +115,9 @@ begin
   DesktopChoice.Checked := ExpandConstant('{param:NODESKTOP|0}') <> '1';
   Found := ExpandConstant('{param:FREECADBIN|}');
   if Found <> '' then Found := AddBackslash(Found) + 'FreeCAD.exe';
-  if Found = '' then Found := Candidate(ExpandConstant('{autopf}'));
+  { autopf follows this per-user install mode to LocalAppData\Programs.
+    FreeCAD's machine-wide installer uses commonpf64 even without elevation. }
+  if Found = '' then Found := Candidate(ExpandConstant('{commonpf64}'));
   if Found = '' then Found := Candidate(ExpandConstant('{localappdata}\Programs'));
   FreeCADPage.Values[0] := Found;
 end;
