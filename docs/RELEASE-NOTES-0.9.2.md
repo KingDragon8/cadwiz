@@ -26,6 +26,11 @@ Source inspection confirmed these independent defects:
   This is distinct from an absent workbench in the dropdown.
 - The old Unix installer copied files before pip/assistant configuration. A
   failure in a later stage could leave an ambiguous partial-success result.
+- Native Mac CI also confirmed that the official 1.1.4 app's bundled Python
+  cannot import FreeCAD with its default module search path. The bootstrap now
+  discovers FreeCAD's extension module inside the selected app and supplies that
+  directory to the child process. This is an observed installer-probe blocker,
+  not proof of the historical failure in Neil's 1.1 installation.
 - PR #7 correctly separated installation from AI setup and staged files, but
   guessed the active directory, handled only one case variant, kept backups in
   `Mod`, and did not roll back post-activation validation failures. It explicitly

@@ -31,6 +31,10 @@ def main():
                CADWIZ_SETTINGS_FILE=str(qa/'settings.json'), CADWIZ_SETUP_DIR=str(qa/'helper'),
                CADWIZ_PLUGIN_BRIDGE='off', CADWIZ_CLIENT_APP='auto')
     python = next(p for p in (args.app/'Contents/Resources/bin/python', args.app/'Contents/Resources/bin/python3') if p.is_file())
+    modules = [p for p in args.app.rglob('FreeCAD*.so')
+               if p.name == 'FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
+    assert len(modules) == 1, f'Expected one FreeCAD module in bundle: {modules}'
+    env['PYTHONPATH'] = str(modules[0].parent)
     gui = args.app/'Contents/MacOS/FreeCAD'
     def run(command):
         result = subprocess.run(list(map(str, command)), env=env, capture_output=True, text=True, timeout=180)
