@@ -400,10 +400,30 @@ class PluginSession:
     def _render(self, views: list[str] | None = None, section: bool = False, current_view: bool = True,
                 object: str | None = None, document: str | None = None) -> dict[str, Any]:  # noqa: A002
         target = self._document(document)
+        # A live-only request must not adopt/render a large assembly in a worker.
+        # Check both GUI and application identities before capturing another MDI view.
+        gui_doc = getattr(self.gui, "ActiveDocument", None)
+        shown_doc = getattr(gui_doc, "Document", None)
+        active_doc = getattr(self.app, "ActiveDocument", None)
+        live_matches = (shown_doc is not None and active_doc is not None
+                        and getattr(shown_doc, "Name", None) == target.Name
+                        and getattr(active_doc, "Name", None) == target.Name)
+        if current_view and not views and not section and not object and live_matches:
+            folder = self.project.folder / "renders"
+            folder.mkdir(parents=True, exist_ok=True)
+            view = self._capture_view(str(folder / f"current_view_{time.time_ns()}.png"))
+            if view:
+                self._remember_picture([view])
+                store = self.store_for(target)
+                return {"images": [view], "captions": ["Live FreeCAD viewport"],
+                        "document": target.Name, "file": str(getattr(target, "FileName", "")),
+                        "version": store.latest() if store is not None else 0,
+                        "presentation_note": "Current native viewport; geometry has not been independently rendered."}
         executor = self._executor(target)
         images = list(executor.render(list(views or ["iso"]), bool(section)).get("images") or [])
         self._remember_picture(images)
-        if current_view:
+        view = ""
+        if current_view and live_matches:
             view = self._capture_view(str(self.project.folder / "renders" / f"current_view_{int(time.time())}.png"))
             if view:
                 images.insert(0, view)

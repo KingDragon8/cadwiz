@@ -313,3 +313,40 @@ def test_opening_existing_document_reuses_unsaved_state(session):
     result = session.call("open_document", {"path": session.doc.FileName})
     assert result["ok"]
     assert session.doc.unsaved_marker == "keep me"
+
+
+def test_live_only_render_does_not_start_geometry_worker(session, tmp_path, monkeypatch):
+    session.gui = SimpleNamespace(ActiveDocument=SimpleNamespace(Document=session.doc))
+    def capture(dest):
+        Path(dest).write_bytes(b"native viewport")
+        return dest
+    monkeypatch.setattr(session, "_capture_view", capture)
+    monkeypatch.setattr(session, "_executor", lambda doc: pytest.fail("live view started geometry worker"))
+    result = session._render(current_view=True)
+    assert result["document"] == session.doc.Name
+    assert result["captions"] == ["Live FreeCAD viewport"]
+    assert session.state["picture"] == result["images"][0]
+    assert Path(result["images"][0]).read_bytes() == b"native viewport"
+
+
+@pytest.mark.parametrize("mode", ["wrong_document", "explicit_views", "capture_failure", "section", "object"])
+def test_geometry_render_remains_available_and_never_captures_wrong_document(session, monkeypatch, mode):
+    shown = session.doc if mode != "wrong_document" else SimpleNamespace(Name="Other")
+    session.gui = SimpleNamespace(ActiveDocument=SimpleNamespace(Document=shown))
+    calls = []
+    executor = SimpleNamespace(store=_Store(), render=lambda views, section: calls.append((views, section)) or {"images": []})
+    monkeypatch.setattr(session, "_executor", lambda doc: executor)
+    captures = []
+    monkeypatch.setattr(session, "_capture_view", lambda dest: captures.append(dest) or "")
+    kwargs = {"current_view": True}
+    if mode == "explicit_views":
+        kwargs["views"] = ["front"]
+    if mode == "section":
+        kwargs["section"] = True
+    if mode == "object":
+        kwargs["object"] = "Cone"
+    result = session._render(**kwargs)
+    assert calls == [(kwargs.get("views", ["iso"]), kwargs.get("section", False))]
+    assert result["document"] == session.doc.Name
+    if mode == "wrong_document":
+        assert not captures
