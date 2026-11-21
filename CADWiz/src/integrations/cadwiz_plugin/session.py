@@ -203,7 +203,7 @@ class PluginSession:
             document.saveAs(file_name)
         return file_name
 
-    def _executor(self, document: Any) -> Any:
+    def _executor(self, document: Any, *, adopt: bool = True) -> Any:
         file_name = self._file_of(document)
         key = str(Path(file_name).resolve()).casefold()
         executor = self._executors.get(key)
@@ -223,7 +223,7 @@ class PluginSession:
                 # A backup of a model that is already broken is recorded as broken,
                 # so the time slider can mark it red (ORDER-2026-10-18-01).
                 executor.store.health_probe = lambda _path, name=document.Name: self._broken_objects(name)
-        if not getattr(executor, "adoption", None):
+        if adopt and not getattr(executor, "adoption", None):
             executor.adopt()
             executor.adopted_at_version = executor.store.latest()
         self.state.update(document=str(getattr(document, "Label", "")), file=file_name, object=str((executor.adoption or {}).get("main_object", "")))
@@ -612,7 +612,7 @@ class PluginSession:
             return {"saved": str(path)}
         if current and Path(current).exists():
             # His file is about to change: its prior state becomes a version first.
-            executor = self._executor(target)
+            executor = self._executor(target, adopt=False)
             if not executor.store.backed_up_this_session:
                 executor.store.backup(lambda dest: shutil.copyfile(current, dest), note="before saving")
         target.save() if current else self._file_of(target)

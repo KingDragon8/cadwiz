@@ -194,11 +194,18 @@ def test_native_open_falls_back_when_gui_loader_does_not_open(session, tmp_path,
     assert attempts == [str(path)]
 
 
-def test_saving_his_file_backs_it_up_first(session) -> None:
-    session.doc.save = lambda: None
+def test_saving_his_file_backs_it_up_first(session, monkeypatch) -> None:
+    monkeypatch.setattr(_Executor, "adopt", lambda self: pytest.fail("saving must not launch geometry adoption"))
+    saved = []
+    def save():
+        executor = next(iter(session._executors.values()))
+        assert executor.store.backed_up_this_session
+        saved.append(True)
+    session.doc.save = save
     result = session.call("save_document", {})
     executor = next(iter(session._executors.values()))
     assert result["ok"] and executor.store.versions and executor.store.versions[0].kind == "backup"
+    assert saved == [True]
 
 
 def test_export_only_through_the_tool_and_every_call_is_logged(session, tmp_path) -> None:
