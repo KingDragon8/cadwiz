@@ -103,7 +103,7 @@ Windows is checked in isolation. Mac helper bundles are included but real-device
 `uninstall_windows.bat`). It removes CADWiz, its shortcuts and its entry in your
 assistant app's settings, and keeps your models and their versions.
 
-**macOS (less tested):** unzip, then run `bash scripts/install.sh`.
+**macOS workbench install/repair (beta):** unzip the release, quit FreeCAD, then run `bash scripts/install_macos.sh` from the extracted release folder. This installs the actual `CADWiz` workbench directly under FreeCAD's user `Mod` directory, backs up a previous `cadwiz` or `CADWiz` directory, and verifies key files before reporting success. It does **not** install Python dependencies or configure Claude/ChatGPT. To diagnose assistant connections after FreeCAD displays the CADWiz panel, use the in-app Setup workflow. If FreeCAD uses a nonstandard user directory, set `MOD_DIR` to that directory's `Mod` folder. If FreeCAD still fails to load CADWiz, inspect its Report view and include the startup error in a feedback report. Avoid repeating Addon Manager's failed Git clone repair.
 
 **Linux:** install through Addon Manager using the steps above. For a manual
 installation, copy the ZIP's `CADWiz` folder into FreeCAD's user `Mod` folder,
