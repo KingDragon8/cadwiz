@@ -118,6 +118,8 @@ class AIMasterExecutor:
         return self.project.contract()
 
     def _run_worker(self, request: dict[str, Any]) -> dict[str, Any]:
+        if Path(self.freecadcmd).name.lower() in ("freecad.exe", "freecad"):
+            raise WorkerFailed("A windowless FreeCAD worker is required. CADWiz will not launch another FreeCAD application to perform this edit.")
         work = Path(tempfile.mkdtemp(prefix="cadwiz_master_"))
         time_limit_s = float(request.get("time_limit_s") or self.time_limit_s)
         request = dict(request, result_path=str(work / "result.json"), time_limit_s=time_limit_s,

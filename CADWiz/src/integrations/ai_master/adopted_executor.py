@@ -111,6 +111,16 @@ class AdoptedExecutor(AIMasterExecutor):
                           render=(self.adoption.get("renders") or [""])[0])
 
     def _apply(self, result: dict[str, Any], result_file: Path, note: str) -> dict[str, Any]:
+        health = result.get("health") or {}
+        if health and not health.get("roundtrip"):
+            return {"success": False, "error": "The saved model did not survive verification; the accepted model was preserved."}
+        facts = _facts_from_dict(result["facts"])
+        contract = self.project.contract()
+        finish_report(facts, contract, self.printer)
+        if contract is not None:
+            failures = check_contract(contract, facts).failures()
+            if failures:
+                return {"success": False, "health": health, "error": "The result did not meet the recorded dimensions or functional requirements: " + "; ".join(r.plain() for r in failures)}
         before = (self.store.current().measurements if self.store.current() else {}) or {}
         after = key_measurements(result.get("facts"), result.get("bottom_opening"), result.get("parameters"))
         diff = measured_diff(before, after)
@@ -126,7 +136,9 @@ class AdoptedExecutor(AIMasterExecutor):
             self._opening[record.version] = result["bottom_opening"]
         self.project.set_active(self.object_name, record.version)
         return {"success": True, "version": record.version, "diff": diff, "measurements": facts.plain_summary(),
-                "bottom_opening": result.get("bottom_opening"), "images": renders}
+                "bottom_opening": result.get("bottom_opening"), "images": renders,
+                "editability": facts.editability.display(), "health": health,
+                "limitation": health.get("exception", "")}
 
     # ---- the tools ------------------------------------------------------------
     def build(self, source_version: int | None) -> dict[str, Any]:
@@ -169,21 +181,23 @@ class AdoptedExecutor(AIMasterExecutor):
 
             values[where] = parse_quantity(str(value)).mm if not isinstance(value, (int, float)) else float(value)
         result = self._run_worker({"action": "set_parameters", "source_path": str(self._latest_file()), "changes": values,
+                                   "render_out": str(self.project.object_folder(self.object_name) / "renders" / f"{target.stem}.png"),
                                    "result_path_fcstd": str(target), "object_name": self.object_name, "project_dir": str(self.project.folder),
                                    "contract": self.project.contract().to_dict() if self.project.contract() else None})
         if not result.get("ok"):
-            return {"success": False, "error": result.get("error")}
+            return {"success": False, "error": result.get("error"), "health": result.get("health")}
         return self._apply(result, target, note or "; ".join(f"{k} = {v:g} mm" for k, v in values.items()))
 
     def edit_existing(self, script: str, note: str) -> dict[str, Any]:
         self._ensure_backup()
         target = self.store.next_version_file()
         result = self._run_worker({"action": "edit_existing", "source_path": str(self._latest_file()), "script": script,
+                                   "require_parametric": bool(getattr(self, "require_parametric", False)),
                                    "result_path_fcstd": str(target), "object_name": self.object_name, "project_dir": str(self.project.folder),
                                    "render_out": str(self.project.object_folder(self.object_name) / "renders" / f"{target.stem}.png"),
                                    "contract": self.project.contract().to_dict() if self.project.contract() else None})
         if not result.get("ok"):
-            return {"success": False, "error": result.get("error"), "error_line": result.get("error_line")}
+            return {"success": False, "error": result.get("error"), "error_line": result.get("error_line"), "health": result.get("health")}
         return self._apply(result, target, note)
 
     #: Rebuilding a lofted body from its rings takes about two minutes on the

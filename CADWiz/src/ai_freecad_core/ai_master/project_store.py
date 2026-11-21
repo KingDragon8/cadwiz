@@ -30,12 +30,50 @@ from .design_source import VersionRecord, VersionStore
 
 def default_projects_root() -> Path:
     override = os.environ.get("CADWIZ_PROJECTS_ROOT", "").strip()
-    return Path(override) if override else Path.home() / "CADWiz Projects"
+    if override:
+        return Path(override).expanduser()
+    # Existing documents keep their filenames and their legacy version stores;
+    # the plug-in resolves those stores separately instead of moving projects.
+    return documents_directory() / "CADWiz"
+
+
+def documents_directory() -> Path:
+    """Use redirected Documents on Windows and the XDG setting on Linux."""
+    if os.name == "nt":
+        try:
+            import winreg
+
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") as key:
+                value, _kind = winreg.QueryValueEx(key, "Personal")
+            return Path(os.path.expandvars(value))
+        except (OSError, ImportError):
+            pass
+    config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "user-dirs.dirs"
+    try:
+        for line in config.read_text(encoding="utf-8").splitlines():
+            if line.startswith('XDG_DOCUMENTS_DIR="') and line.endswith('"'):
+                value = line.split('"', 2)[1].replace("${HOME}", str(Path.home())).replace("$HOME", str(Path.home()))
+                candidate = Path(value)
+                if candidate.is_absolute():
+                    return candidate
+    except (OSError, UnicodeError):
+        pass
+    try:
+        from PySide.QtCore import QStandardPaths
+        found = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+        if found:
+            return Path(found)
+    except ImportError:
+        pass
+    return Path.home() / "Documents"
 
 
 def safe_name(name: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9_. -]+", "_", (name or "").strip()).strip(" ._")
-    return cleaned or "Untitled"
+    if re.fullmatch(r"(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", cleaned, re.I):
+        cleaned = "_" + cleaned
+    return cleaned[:100].rstrip(" .") or "Untitled"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +104,10 @@ class Project:
 
     @classmethod
     def open(cls, name: str, root: str | Path | None = None) -> "Project":
-        return cls(Path(root or default_projects_root()) / safe_name(name))
+        chosen = Path(root or default_projects_root()).expanduser()
+        if not chosen.is_absolute():
+            raise ValueError("Choose an absolute project folder; CADWiz will not save into an arbitrary working directory.")
+        return cls(chosen / safe_name(name))
 
     # ---- objects and versions --------------------------------------------
     def object_folder(self, object_name: str) -> Path:

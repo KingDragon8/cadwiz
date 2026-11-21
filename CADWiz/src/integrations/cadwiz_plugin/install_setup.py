@@ -16,7 +16,7 @@ import time
 import tomllib
 from pathlib import Path
 
-VERSION = "0.6.1"
+VERSION = "0.9.2"
 
 
 def data_dir() -> Path:
@@ -178,7 +178,7 @@ def check(info: dict) -> dict:
         parsed = tomllib.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
         existing = parsed.get("mcp_servers", {}).get("cadwiz")
         if existing and existing != server_values(info):
-            status.update(code="CW-SETUP-PATH", message="The saved OpenAI connection needs an update. Press Connect ChatGPT / Codex; a backup and undo are included.")
+            status.update(code="CW-SETUP-PATH", message="The saved OpenAI connection needs an update. Press Connect Codex; a backup and undo are included.")
     except (OSError, ValueError, KeyError) as error:
         status.update(code="CW-SETUP-CHECK", message=str(error))
     status["elapsed_ms"] = round((time.monotonic() - started) * 1000, 2)
@@ -208,7 +208,7 @@ def repair_owned(info: dict, pause=time.sleep) -> dict:
         if (target.read_text(encoding="utf-8-sig") if target.exists() else "") != text:
             continue
         connect(info, target)
-        return {"code": "CW-SETUP-RESTART", "message": "CADWiz repaired its saved connection. Backup and Undo are available. Fully quit and reopen ChatGPT / Codex desktop."}
+        return {"code": "CW-SETUP-RESTART", "message": "CADWiz repaired its saved connection. Backup and Undo are available. Fully quit and reopen Codex."}
     return {"code": "CW-SETUP-STOPPED", "message": "Settings are still changing. Automatic repair stopped. Use Connect or Get help."}
 
 

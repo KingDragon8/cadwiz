@@ -74,7 +74,7 @@ NOT_CONNECTED = "Not connected"
 # The one founder action that fixes a red light with the app already open is quitting it
 # fully: an app that was running when CADWiz was installed never read its new settings
 # (ORDER-2026-10-23-02). So the red line says that, not only "press Connect".
-NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or the ChatGPT app); this turns green by itself "
+NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or Codex); this turns green by itself "
                       "within 30 seconds. Still red with the app open? Quit the app fully -- right-click its icon by the clock, "
                       "then Quit -- and open it again.")
 #: How long after FreeCAD opens the light waits (amber) for the first check-in.
@@ -83,6 +83,12 @@ NO_BRIDGE = "Not connected — CADWiz's plug-in did not start; close and reopen 
 NO_BRIDGE_TODO = "Close FreeCAD and open it again. If the light stays red, open Setup below."
 NO_PICTURE = "A picture of the model appears here after your assistant builds or changes it."
 NO_MODEL = "Open or create a model in FreeCAD and it appears here, in any workbench."
+COMMUNICATION_TITLE = "Wiz communication screen"
+COMMUNICATION_GUIDANCE = (
+    "Use the quick buttons above to control the model.\n\n"
+    "Use the tools below to point to and mark things in this communication screen "
+    "so you can explain to your AI partner what you want done."
+)
 FROZEN = "Frozen. Now tell your assistant what you mean, in its app."
 CLAUDE_HAS_IT = "Your assistant has it"
 
@@ -136,8 +142,8 @@ def _button(QtWidgets: Any, key: str, parent: Any) -> Any:
 
 def assistant_word(ai_app: str) -> str:
     """The name on the Show button for the assistant chosen at the top of the panel
-    (ORDER-2026-10-21-01: CADWiz works with Claude or ChatGPT; neither is the default)."""
-    return {"claude": "Claude", "chatgpt": "ChatGPT"}.get(str(ai_app), "assistant")
+    (ORDER-2026-10-21-01: CADWiz works with Claude or Codex; neither is the default)."""
+    return {"claude": "Claude", "chatgpt": "Codex"}.get(str(ai_app), "assistant")
 
 
 def run_freecad_command(command: str) -> None:
@@ -547,6 +553,9 @@ class _Panel:
         self.setup = SetupPage(self)
         self.pages.addWidget(self.printing.page)
         self.pages.addWidget(self.setup.page)
+        from integrations.cadwiz_plugin.aiwiz import AIWizPage
+        self.free_ai = AIWizPage(self)
+        self.pages.addWidget(self.free_ai.page)
         column.addWidget(self.pages, 1)
         self.strip = self._build_strip()
         outer.addWidget(self.strip)
@@ -572,6 +581,9 @@ class _Panel:
         self.slow.start()
         content.installEventFilter(_ActivityFilter.make(QtCore, self))
         self.refresh()
+
+        # Shared Windows/macOS/Linux first-run destination; never starts another GUI.
+        self.open_page(3)
 
     # ---- shared state ---------------------------------------------------------------------
     def bridge(self) -> Any:
@@ -684,7 +696,7 @@ class _Panel:
         self.connect_button = QtWidgets.QPushButton("Connect", header)
         self.connect_button.setObjectName("CADWiz_Connect")
         self.connect_button.setProperty("role", "primary")
-        self.connect_button.setToolTip("Connect your assistant: opens the app chosen under Talk to (Claude or ChatGPT) if it is closed, then waits for it to check in")
+        self.connect_button.setToolTip("Connect your assistant: opens the app chosen under Talk to (Claude or Codex) if it is closed, then waits for it to check in")
         self.connect_button.clicked.connect(self.connect_claude)
         self.connect_button.hide()
         self.connector = None
@@ -702,24 +714,21 @@ class _Panel:
         setup_actions.addWidget(self.connect_button)
         setup_actions.addWidget(self.undo_connection_button)
         setup_actions.addWidget(self.manual_connection_button)
-        help_button = QtWidgets.QPushButton("Get help", header)
-        help_button.clicked.connect(self.connection_help)
-        setup_actions.addWidget(help_button)
         setup_actions.addStretch(1)
         info.addLayout(setup_actions)
         row.addLayout(info, 1)
         return header
 
     def _build_page_bar(self) -> Any:
-        """Creating · Printing · Setup, and Pop out (section 2.6)."""
+        """Navigation wraps at narrow dock widths rather than squeezing the CAD view."""
         QtWidgets = self.QtWidgets
         bar = QtWidgets.QFrame(self.full)
         bar.setObjectName("CADWiz_Page_Bar")
-        row = QtWidgets.QHBoxLayout(bar)
+        row = _make_flow_layout(self.QtCore, QtWidgets)(bar, 6)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(6)
         self.page_buttons = []
-        for index, name in enumerate(("Creating", "Printing", "Setup")):
+        for index, name in enumerate(("Creating", "Printing", "Setup", "AIWiz")):
             button = QtWidgets.QPushButton(name, bar)
             button.setObjectName(f"CADWiz_Page_{name}")
             button.setProperty("role", "page")
@@ -728,7 +737,6 @@ class _Panel:
             row.addWidget(button)
             self.page_buttons.append(button)
         self.page_buttons[0].setChecked(True)
-        row.addStretch(1)
         self.pop_button = _button(QtWidgets, "pop_out", bar)
         self.pop_button.clicked.connect(lambda: self.host.toggle_floating())
         row.addWidget(self.pop_button)
@@ -809,6 +817,20 @@ class _Panel:
             button.clicked.connect(lambda _c=False, i=index: self.show_screen(i))
             switch.addWidget(button)
         column.addWidget(top_row)
+        self.communication_title = QtWidgets.QLabel(COMMUNICATION_TITLE, page)
+        self.communication_title.setObjectName('CADWiz_Communication_Title')
+        self.communication_title.setAlignment(QtCore.Qt.AlignCenter)
+        title_font = self.QtGui.QFont('Arial')
+        title_font.setPixelSize(TEXT_PX + 4)
+        title_font.setBold(True)
+        self.communication_title.setFont(title_font)
+        self.communication_title.setWordWrap(True)
+        column.addWidget(self.communication_title)
+        self.communication_guidance = QtWidgets.QLabel(COMMUNICATION_GUIDANCE.replace('\n\n', ' '), page)
+        self.communication_guidance.setObjectName('CADWiz_Communication_Guidance')
+        self.communication_guidance.setWordWrap(True)
+        self.communication_guidance.setAlignment(QtCore.Qt.AlignCenter)
+        column.addWidget(self.communication_guidance)
         self.screen_stack = QtWidgets.QStackedWidget(page)
         self.canvas = _make_canvas(QtCore, self.QtGui, QtWidgets)(self.screen_stack, self)
         self.canvas.setObjectName("CADWiz_Screen")
@@ -847,6 +869,10 @@ class _Panel:
         self.last_change.setObjectName("CADWiz_Last_Change")
         self.last_change.setWordWrap(True)
         below.addWidget(self.last_change)
+        self.editability_label = QtWidgets.QLabel(holder)
+        self.editability_label.setObjectName("CADWiz_Editability")
+        self.editability_label.setWordWrap(True)
+        below.addWidget(self.editability_label)
         from integrations.cadwiz_plugin.panel_pages import ProblemsCard
 
         self.problems_card = ProblemsCard(self, holder)
@@ -1056,6 +1082,8 @@ class _Panel:
             self.printing.refresh()
         if index == 2:
             self.setup.refresh()
+        if index == 3:
+            self.free_ai.refresh()
 
     def connection_now(self) -> dict[str, str]:
         return self.light_now()
@@ -1089,6 +1117,9 @@ class _Panel:
 
     def connect_claude(self) -> None:
         from integrations.cadwiz_plugin.setup_panel import connect
+        choose = getattr(self.bridge(), "select_current", None)
+        if callable(choose):
+            choose()
         connect(self)
         self.refresh()
 
@@ -1107,6 +1138,9 @@ class _Panel:
         from integrations.cadwiz_plugin import preferences_store
 
         preferences_store.save(self.prefs)
+        if self.bridge() is None:
+            from integrations.cadwiz_plugin.addon import start_bridge
+            start_bridge()
         self.content.setStyleSheet(style_sheet(self.prefs.text_px))
         self.snug_buttons()
         self.canvas.update()
@@ -1500,6 +1534,9 @@ class _Panel:
     # ---- Show Claude -------------------------------------------------------------------------------
     def freeze_for_claude(self, request: dict[str, Any] | None = None) -> None:
         from integrations.cadwiz_plugin import view_link
+        choose = getattr(self.bridge(), "select_current", None)
+        if callable(choose):
+            choose()
 
         screen = self.screen()
         view, document, gui = self.view(), self.document(), self.gui()
@@ -1685,6 +1722,8 @@ class _Panel:
 
     # ---- the slow refresh -----------------------------------------------------------------------
     def refresh(self) -> None:
+        if self.pages.currentIndex() == 3:
+            self.free_ai.refresh()
         light = self.light_now()
         self.light.setText(f"● {light['line']}")
         self.light.setStyleSheet(f"color: {light['light']}; font-weight: 700;")
@@ -1721,6 +1760,13 @@ class _Panel:
         self.working.setText(version_line(str(document.Label) if document is not None else "", self.latest_version))
         self.last_change.setText(last_change_line(self.stops[-1] if self.stops else None))
         self.last_change.setVisible(bool(self.last_change.text()))
+        session = self.session()
+        same_file = session is not None and document is not None and str(getattr(document, "FileName", "")) == session.state.get("file")
+        level = str(session.state.get("editability", "")) if same_file else ""
+        text = "Last editability check: " + (level or "not verified — use Setup → Check model health")
+        if level and bool(getattr(document, "Modified", False)):
+            text += " · Unsaved changes: recheck model health."
+        self.editability_label.setText(text)
         self.apply_folds()
         shown = self.screen().shown
         read = shown.get("read_by_claude_utc") if shown else None
@@ -1865,6 +1911,16 @@ def _make_canvas(QtCore: Any, QtGui: Any, QtWidgets: Any) -> Any:
             self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
             self.setMouseTracking(True)
             self.setAccessibleName("CADWiz Visual Communications Screen")
+            self.empty_hint = QtWidgets.QTextBrowser(self)
+            self.empty_hint.setObjectName('CADWiz_Communication_Guidance')
+            self.empty_hint.setFrameShape(QtWidgets.QFrame.NoFrame)
+            self.empty_hint.setStyleSheet('QTextBrowser { background: white; color: #5A6270; border: none; }')
+            self.empty_hint.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            hint_font = QtGui.QFont('Arial')
+            hint_font.setPixelSize(TEXT_PX)
+            self.empty_hint.setFont(hint_font)
+            self.empty_hint.hide()
+            self.empty_hint_key = None
             self.compare_bar = QtWidgets.QWidget(self)
             row = QtWidgets.QHBoxLayout(self.compare_bar)
             row.setContentsMargins(8, 8, 8, 8)
@@ -1979,12 +2035,20 @@ def _make_canvas(QtCore: Any, QtGui: Any, QtWidgets: Any) -> Any:
             font.setPixelSize(TEXT_PX)
             painter.setFont(font)
             compare = panel.compare
+            if compare is not None or panel.picture is not None:
+                self.empty_hint.hide()
             if compare is not None:
                 self._paint_compare(painter, compare)
             elif panel.picture is None:
                 painter.setPen(QtGui.QColor("#5A6270"))
-                painter.drawText(self.rect().adjusted(24, 24, -24, -24), QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap,
-                                 NO_MODEL if panel.document() is None else NO_PICTURE)
+                empty_model = panel.document() is None
+                if self.empty_hint_key != empty_model:
+                    self.empty_hint_key = empty_model
+                    intro = NO_MODEL if empty_model else NO_PICTURE
+                    self.empty_hint.setHtml(
+                        '<div align="center"><p>' + intro + '</p></div>')
+                self.empty_hint.setGeometry(self.rect().adjusted(18, 12, -18, -12))
+                self.empty_hint.show()
             else:
                 rect = self.picture_rect()
                 painter.drawPixmap(rect, panel.picture, QtCore.QRectF(panel.picture.rect()))

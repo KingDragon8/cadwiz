@@ -45,7 +45,7 @@ class Printer:
 
 #: Which AI app he talks to (ORDER-2026-10-19-02): picked at the top of the Creating
 #: page; "auto" = whichever of them is connected.
-AI_APPS = {"auto": "Whichever app I have open", "claude": "Claude", "chatgpt": "ChatGPT"}
+AI_APPS = {"auto": "Whichever app I have open", "claude": "Claude", "chatgpt": "OpenAI / Codex"}
 
 
 @dataclass(slots=True)

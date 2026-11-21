@@ -37,7 +37,8 @@ PRINT_TIME_HONEST = ("Print time and filament: your slicer shows these when you 
                      "CADWiz can't read them from {slicer} yet.")
 
 
-CLAUDE_USAGE_LINE = "Your talks with your assistant come out of your Claude or ChatGPT subscription. There is no charge per question."
+CLAUDE_USAGE_LINE = ("Your assistant uses your chosen account's access and limits. "
+                     "CADWiz does not add a per-question fee; free access and remaining capacity depend on the provider.")
 
 
 def usage_lines(rows: list[dict[str, Any]]) -> list[str]:
@@ -47,15 +48,11 @@ def usage_lines(rows: list[dict[str, Any]]) -> list[str]:
     return [CLAUDE_USAGE_LINE]
 
 
-CHATGPT_CONNECTED = "ChatGPT connected"
-CHATGPT_NOT_CONNECTED = "ChatGPT not connected"
-CHATGPT_TODO = ("Open the ChatGPT desktop app (for Windows and Mac, signed in with your ChatGPT "
-                "account) -- this turns green by itself within 30 seconds. If CADWiz isn't in its settings yet, run "
-                "CADWiz's installer again.")
-CODEX_STEPS = ("To use ChatGPT: install the ChatGPT desktop app (chatgpt.com/download), sign in with your ChatGPT "
-               "account, then run CADWiz's installer again -- it adds CADWiz to the app's settings (its MCP servers, "
-               "in .codex/config.toml). Choose ChatGPT under Talk to; the ChatGPT light turns green only when the "
-               "app has really connected.")
+CHATGPT_CONNECTED = "Codex connected"
+CHATGPT_NOT_CONNECTED = "Codex not connected"
+CHATGPT_TODO = ("Open Codex on this computer and ask what is open in FreeCAD. If you just connected, fully quit and reopen Codex first.")
+CODEX_STEPS = ("Open AIWiz, choose AI Wiz Setup, then OpenAI to connect Codex. ChatGPT and Codex are different apps. "
+               "Your existing account permissions and limits apply.")
 
 
 def ai_lights(bridge: Any, choice: str) -> list[dict[str, str]]:
@@ -117,6 +114,7 @@ class AiChoice:
         panel = self.panel
         lights = ai_lights(panel.bridge(), panel.prefs.ai_app)
         first = lights[0]
+        # Preserve the selected assistant's reconnect progress in the header.
         if getattr(panel, "connector", None) is not None:
             first = panel.light_now()
         panel.light.setText(f"● {first['line']}")
@@ -366,8 +364,14 @@ class PrintingPage:
         slicer = QtWidgets.QPushButton("Open in slicer", holder)
         slicer.setObjectName("CADWiz_Open_Slicer")
         slicer.clicked.connect(self.open_in_slicer)
+        # Beta 1.0 report E-15 / I-7: a project file named .gcode once reached his printer.
+        check_file = QtWidgets.QPushButton("Check a print file…", holder)
+        check_file.setObjectName("CADWiz_Check_Print_File")
+        check_file.setToolTip("Before printing: is it really G-code, and what bed and nozzle temperatures does it use?")
+        check_file.clicked.connect(self.check_print_file)
         flow.addWidget(folder)
         flow.addWidget(slicer)
+        flow.addWidget(check_file)
         self.export_result = QtWidgets.QLabel("Files go to CADWiz's project folder; nothing of yours is overwritten.", export)
         self.export_result.setObjectName("CADWiz_Export_Result")
         self.export_result.setWordWrap(True)
@@ -448,7 +452,12 @@ class PrintingPage:
         reply = panel._call("export", {"format": fmt, "document": document.Name})
         if reply.get("ok") and reply.get("path"):
             self.last_export = str(reply["path"])
-            self.export_result.setText(f"Saved {self.last_export}")
+            paths = [str(p) for p in reply.get("paths") or [self.last_export]]
+            if len(paths) > 1:
+                self.export_result.setText(f"Saved {len(paths)} print files, one per part, in {Path(paths[0]).parent}:\n"
+                                           + "\n".join(Path(p).name for p in paths))
+            else:
+                self.export_result.setText(f"Saved {self.last_export}")
         else:
             self.export_result.setText(reply.get("say_to_founder") or "The export did not finish.")
 
@@ -460,6 +469,15 @@ class PrintingPage:
         if folder is not None:
             folder.mkdir(parents=True, exist_ok=True)
             self.panel.QtGui.QDesktopServices.openUrl(self.panel.QtCore.QUrl.fromLocalFile(str(folder)))
+
+    def check_print_file(self) -> None:
+        from ai_freecad_core.export_check import check_print_file
+
+        chosen, _filter = self.panel.QtWidgets.QFileDialog.getOpenFileName(
+            self.page, "Check a print file", str(Path.home()), "Print files (*.gcode *.gco *.g *.bgcode);;All files (*)")
+        if chosen:
+            report = check_print_file(chosen, material=str(self.panel.prefs.print_material or ""))
+            self.export_result.setText(("✔ " if report.printable else "✖ ") + report.say())
 
     def open_in_slicer(self) -> None:
         if not self.last_export or not Path(self.last_export).is_file():
@@ -594,6 +612,23 @@ class SetupPage:
         folder_row.addWidget(self.folder, 1)
         folder_row.addWidget(choose)
         v_col.addLayout(folder_row)
+        # Beta 1.0 report E-4: CADWiz refused his helmet folder and nothing let him allow it.
+        v_col.addWidget(QtWidgets.QLabel("Folders CADWiz may open (your Documents folder always can):", saving))
+        self.cad_folder_list = QtWidgets.QListWidget(saving)
+        self.cad_folder_list.setObjectName("CADWiz_Setup_CAD_Folders")
+        self.cad_folder_list.setMaximumHeight(90)
+        v_col.addWidget(self.cad_folder_list)
+        cad_row = QtWidgets.QHBoxLayout()
+        add_folder = QtWidgets.QPushButton("Add folder…", saving)
+        add_folder.setObjectName("CADWiz_Setup_Add_CAD_Folder")
+        add_folder.clicked.connect(self.add_cad_folder)
+        remove_folder = QtWidgets.QPushButton("Remove", saving)
+        remove_folder.setObjectName("CADWiz_Setup_Remove_CAD_Folder")
+        remove_folder.clicked.connect(self.remove_cad_folder)
+        cad_row.addWidget(add_folder)
+        cad_row.addWidget(remove_folder)
+        cad_row.addStretch(1)
+        v_col.addLayout(cad_row)
         shown_row = QtWidgets.QHBoxLayout()
         self.versions_shown = QtWidgets.QSpinBox(saving)
         self.versions_shown.setRange(1, 500)
@@ -687,10 +722,43 @@ class SetupPage:
         get_help.clicked.connect(self.get_help)
         self.last_report_id = ""
         x_col.addWidget(self.report_note)
-        buttons = QtWidgets.QHBoxLayout()
+        from integrations.cadwiz_plugin.slim_panel import _make_flow_layout
+        buttons = _make_flow_layout(self.panel.QtCore, QtWidgets)(None, 6)
         buttons.addWidget(report)
         buttons.addWidget(get_help)
+        doctor = QtWidgets.QPushButton("Check Installation", help_box)
+        doctor.setObjectName("CADWiz_Doctor")
+        doctor.setToolTip("Offline installation checks. No repairs, uploads or new FreeCAD windows.")
+        doctor.clicked.connect(self.run_doctor)
+        buttons.addWidget(doctor)
+        repair = QtWidgets.QPushButton('Repair CADWiz', help_box)
+        repair.setObjectName('CADWiz_Repair_Installation')
+        repair.clicked.connect(self.repair_installation)
+        buttons.addWidget(repair)
         x_col.addLayout(buttons)
+        ai_help = QtWidgets.QPushButton("Copy instructions for my assistant", help_box)
+        ai_help.setObjectName("CADWiz_Copy_AI_Help")
+        ai_help.clicked.connect(self.copy_ai_help)
+        x_col.addWidget(ai_help)
+        recovery = QtWidgets.QHBoxLayout()
+        health = QtWidgets.QPushButton("Check model health", help_box)
+        health.setObjectName("CADWiz_Check_Model_Health")
+        health.clicked.connect(self.check_model_health)
+        reset = QtWidgets.QPushButton("Reset CADWiz Layout", help_box)
+        reset.setObjectName("CADWiz_Reset_Layout_Button")
+        reset.clicked.connect(lambda: self.panel.host.reset_layout())
+        recovery.addWidget(health)
+        recovery.addWidget(reset)
+        x_col.addLayout(recovery)
+        construction = QtWidgets.QCheckBox("Show construction geometry", help_box)
+        construction.setObjectName("CADWiz_Show_Construction")
+        construction.toggled.connect(self.show_construction)
+        self.construction = construction
+        x_col.addWidget(construction)
+        clean = QtWidgets.QPushButton("Clean model view", help_box)
+        clean.setObjectName("CADWiz_Clean_Model_View")
+        clean.clicked.connect(lambda: self.show_construction(False))
+        x_col.addWidget(clean)
         x_col.addWidget(self.report_result)
         x_col.addWidget(self.report_preview)
         column.addWidget(help_box)
@@ -743,10 +811,20 @@ class SetupPage:
         for site, box in self.sites.items():
             box.setChecked(site in prefs.model_sites)
         session = self.panel.session()
-        folder = prefs.project_folder or (str(session.project.folder) if session is not None else "")
-        self.folder.setText(f"Project folder: {folder}")
+        from ai_freecad_core.ai_master.project_store import default_projects_root
+        current = self.panel.document()
+        folder = str(getattr(current, "FileName", "") or "not saved yet")
+        configured = prefs.project_folder or str(default_projects_root())
+        self.folder.setText(f"Current file: {folder}\nNew project root: {configured}")
         self._folder = prefs.project_folder
+        document = self.panel.document()
+        from integrations.ai_master.parametric_checks import REFERENCE_TYPES
+        showing = document is not None and any(bool(getattr(o, "Visibility", False)) for o in document.Objects if str(o.TypeId).startswith(REFERENCE_TYPES))
+        self.construction.blockSignals(True)
+        self.construction.setChecked(bool(showing))
+        self.construction.blockSignals(False)
         self.versions_shown.setValue(prefs.versions_shown)
+        self._show_cad_folders()
         self.saved.setText("")
         from ai_freecad_core.ai.spend_guard import _log_rows
 
@@ -788,6 +866,31 @@ class SetupPage:
             self._folder = chosen
             self.folder.setText(f"Project folder: {chosen}")
 
+    def _show_cad_folders(self) -> None:
+        from integrations.cadwiz_plugin.session import listed_cad_folders
+
+        self.cad_folder_list.clear()
+        self.cad_folder_list.addItems(listed_cad_folders())
+
+    def add_cad_folder(self) -> None:
+        """Saved at once, like the folder list in File Explorer -- no Save settings needed."""
+        from integrations.cadwiz_plugin.session import add_cad_folder
+
+        chosen = self.panel.QtWidgets.QFileDialog.getExistingDirectory(self.page, "A folder CADWiz may open", str(Path.home()))
+        if chosen:
+            add_cad_folder(chosen)
+            self._show_cad_folders()
+            self.saved.setText(f"Added. CADWiz may now open files in {chosen}.")
+
+    def remove_cad_folder(self) -> None:
+        from integrations.cadwiz_plugin.session import remove_cad_folder
+
+        item = self.cad_folder_list.currentItem()
+        if item is not None:
+            remove_cad_folder(item.text())
+            self._show_cad_folders()
+            self.saved.setText("Removed. Files you already have open are not affected.")
+
     def save(self) -> None:
         self._keep_printer(self._current)
         try:
@@ -803,8 +906,26 @@ class SetupPage:
         except ValueError as error:
             self.saved.setText(f"Not saved: {error}.")
             return
+        session = self.panel.session()
+        selected = None
+        if session is not None and self._folder:
+            from ai_freecad_core.ai_master.project_store import Project
+            try:
+                selected = Project.open(session.project.name, root=self._folder)
+            except OSError:
+                self.saved.setText("That folder is unavailable. Existing projects and saved preferences were kept.")
+                return
+        previous = self.panel.prefs
         self.panel.prefs = prefs
-        self.panel.save_preferences()
+        try:
+            self.panel.save_preferences()
+        except (OSError, ValueError) as error:
+            self.panel.prefs = previous
+            self.saved.setText(f"Preferences were not saved: {error}")
+            return
+        if selected is not None:
+            session.project = selected
+            session.register_project_root(selected.folder)
         self.saved.setText("Saved. Your assistant follows these from its next message.")
         self.refresh()
 
@@ -961,6 +1082,73 @@ class SetupPage:
             freecad = ".".join(import_module("FreeCAD").Version()[:3])
         return {"cadwiz": CADWIZ_VERSION, "freecad": freecad or "unknown", "os": platform.platform(terse=True),
                 "claude_desktop": "unknown"}
+
+    def check_model_health(self) -> None:
+        self.report_result.setText("Checking a disposable copy; your accepted model stays unchanged…")
+        self.panel.QtWidgets.QApplication.processEvents()
+        result = self.panel._call("model_health", {})
+        health = result.get("health", {})
+        recovery = (" To make this editable, ask your assistant to reconstruct a separate native parametric copy using this model as the reference. Keep the original; its missing history cannot simply be switched on."
+                    if health.get("level") in ("E0", "E1") else "")
+        self.report_result.setText((f"{health.get('level', 'Unverified')}: save/reopen {'passed' if health.get('roundtrip') else 'failed'}. "
+                                   f"Verified changes: {', '.join(health.get('changed_parameters', [])) or 'none'}. "
+                                   + (f"Exception: {health['exception']}" if health.get('exception') else "") + recovery)
+                                  if health else result.get("say_to_founder", "Health check did not finish."))
+
+    def show_construction(self, show: bool) -> None:
+        result = self.panel._call("construction_visibility", {"show": bool(show)})
+        if result.get("ok"):
+            self.construction.blockSignals(True)
+            self.construction.setChecked(bool(show))
+            self.construction.blockSignals(False)
+        self.report_result.setText(result.get("note") or result.get("say_to_founder") or "Display updated.")
+
+    def copy_ai_help(self) -> None:
+        support = Path(__file__).resolve().parents[3] / "docs" / "CADWIZ-SUPPORT.md"
+        text = ("Help me troubleshoot CADWiz. Read the version-matched support instructions below. "
+                "Start with read-only checks, preserve my files and use my existing FreeCAD window.\n\n")
+        try:
+            text += support.read_text(encoding="utf-8")
+        except OSError:
+            text += "Run CADWiz Doctor from Setup. Do not assume installation, startup and AI connection are the same check."
+        self.panel.QtWidgets.QApplication.clipboard().setText(text)
+        self.report_result.setText("Support instructions copied. Paste them into your chosen assistant; nothing was sent.")
+
+    def run_doctor(self) -> None:
+        from integrations.cadwiz_plugin.doctor import inspect
+
+        session = self.panel.session()
+        user_data = None
+        if session is not None:
+            getter = getattr(session.app, "getUserAppDataDir", None)
+            if callable(getter):
+                user_data = Path(getter())
+        runtime = None
+        if session is not None:
+            gui = import_module('FreeCADGui')
+            bridge = self.panel.bridge()
+            runtime = {'freecad_version': '.'.join(session.app.Version()[:3]),
+                       'workbench_registered': 'CADWizWorkbench' in gui.listWorkbenches(),
+                       'panel_open': self.panel.full.isVisible(),
+                       'assistant_connected': bool(getattr(bridge, 'connected', False))}
+        result = inspect(user_data, include_paths=True, runtime=runtime)
+        lines = ["CADWiz Doctor — offline, read-only (local paths; review before sharing)",
+                 json.dumps(result['runtime'], indent=2), *result["issues"]]
+        for item in result["installations"]:
+            lines.append(f"{item['directory']} — {item['version']} — {item['method']}")
+            lines.extend(item["problems"])
+        lines.append(f"Rollback records: {result['rollback_records']}")
+        lines.append(result["next_action"])
+        self.report_result.setText("\n".join(lines))
+
+    def repair_installation(self) -> None:
+        self.run_doctor()
+        self.report_result.setText(self.report_result.text() + '\n\nRepair CADWiz: Save your work and quit FreeCAD completely. '
+            'Extract the complete 0.9.2 release ZIP. On Mac, run Install-CADWiz.command (or bash scripts/install_macos.sh). '
+            'On Linux run bash scripts/install.sh with the selected FreeCAD Python. On Windows rerun Setup.exe. '
+            'The Mac/Linux repair stages and verifies files, preserves old installations outside Mod, and prints a rollback manifest. '
+            'It does not configure AI accounts. Restart FreeCAD, select CADWiz, verify its panel, then use AI Wiz Setup. '
+            'No repair runs while this FreeCAD window is open.')
 
     def get_help(self) -> None:
         from integrations.cadwiz_plugin.error_report import load_report

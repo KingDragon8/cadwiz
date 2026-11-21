@@ -40,22 +40,11 @@ SKIP_TYPES = ("Sketcher::", "Spreadsheet::", "App::Origin", "App::Line", "App::P
 
 def _top_level(doc):
     """The objects that ARE the design: shapes nothing else consumes."""
-    out = []
-    for obj in doc.Objects:
-        type_id = str(getattr(obj, "TypeId", ""))
-        if type_id.startswith(SKIP_TYPES):
-            continue
-        shape = getattr(obj, "Shape", None)
-        try:
-            if shape is None or shape.isNull():
-                continue
-        except Exception:  # noqa: BLE001
-            continue
-        users = [u for u in getattr(obj, "InList", []) if not str(getattr(u, "TypeId", "")).startswith(("App::Origin", "Spreadsheet::"))]
-        if users:
-            continue
-        out.append(obj)
-    return out
+    from integrations.ai_master.parametric_checks import final_shapes
+    finished = final_shapes(doc)
+    return [o for o in doc.Objects if o.Name in finished]
+
+
 
 
 def _picture_mesh(shape, budget):
@@ -576,17 +565,35 @@ def _set_parameter(doc, where, value_mm):
 
 
 def _job_set_parameters(request, record):
+    from integrations.ai_master.parametric_checks import STATUS, final_shapes, native_evidence, verify_saved
     doc, _ = _open_any(request["source_path"])
+    owned = doc.getObject(STATUS) is not None
+    parametric = native_evidence(doc)["functional_tree"]
     for where, value in request["changes"].items():
+        before = final_shapes(doc)
+        old = next((p["value"] for p in _named_parameters(doc) if p["where"] == where), None)
         _set_parameter(doc, where, float(value))
+        doc.recompute()
+        if old is not None and abs(float(old) - float(value)) > 0.000001 and final_shapes(doc) == before:
+            record.update(ok=False, error=f"Changing {where} did not change the model geometry. Its driving link needs correction; the previous model was kept.")
+            return
     doc.recompute()
     broken = [o.Label for o in doc.Objects if set(map(str, getattr(o, "State", []) or [])) & {"Invalid", "Error"}]
     if broken:
         record.update(ok=False, error="the model broke after the change: " + ", ".join(broken))
         return
-    doc.saveAs(request["result_path_fcstd"])
+    exception = str((request.get("contract") or {}).get("construction_exception", ""))
+    doc, health = verify_saved(doc, request["result_path_fcstd"], owned=owned, exception=exception)
+    if not health["roundtrip"] or ((owned or parametric) and health["level"] != "E3" and not health["exception"]):
+        record.update(ok=False, health=health, error="The parameter change did not preserve verified editability. The accepted model was preserved.")
+        return
     facts, _ = _measure(doc, request)
-    record.update(ok=True, facts=facts.to_dict(), parameters=_named_parameters(doc))
+    facts.feature_tree["verified_parameters"] = len(health["changed_parameters"]) if health["level"] == "E3" else 0
+    from ai_freecad_core.ai_master.fact_layer import finish_report
+    finish_report(facts, None)
+    _main, objects = _main_shape(doc)
+    record.update(ok=True, health=health, facts=facts.to_dict(), parameters=_named_parameters(doc),
+                  renders=_render(doc, objects, request["render_out"], ["iso"], False) if request.get("render_out") else [])
 
 
 def _job_edit_existing(request, record):
@@ -600,7 +607,13 @@ def _job_edit_existing(request, record):
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # noqa: F401
     import Part  # noqa: F401
 
+    from integrations.ai_master.parametric_checks import STATUS, final_shapes, native_evidence, remember_references, verify_saved
     doc, _ = _open_any(request["source_path"])
+    new_design = not bool(final_shapes(doc))
+    owned = new_design or doc.getObject(STATUS) is not None
+    if not new_design:
+        remember_references(doc)
+    preserve_parametric = bool(native_evidence(doc)["functional_tree"])
     FreeCAD.setActiveDocument(doc.Name)
     policy = cadwiz_sandbox.SandboxPolicy(request["project_dir"])
     namespace = cadwiz_sandbox.make_sandbox_globals(policy, {"FreeCAD": FreeCAD, "App": FreeCAD, "doc": doc})
@@ -621,10 +634,27 @@ def _job_edit_existing(request, record):
     if broken:
         record.update(ok=False, error="objects in error after the edit: " + ", ".join(broken))
         return
-    doc.saveAs(request["result_path_fcstd"])
+    exception = str((request.get("contract") or {}).get("construction_exception", "")).strip()
+    doc, health = verify_saved(doc, request["result_path_fcstd"], owned=owned, exception=exception)
+    required = new_design or preserve_parametric or owned or request.get("require_parametric", False)
+    if not health["roundtrip"] or (required and health["level"] != "E3" and not health["exception"]):
+        record.update(ok=False, health=health, error="The result was not accepted: native editable features must survive save/reopen and a real driving-dimension change. Build sketches with constraints and linked Pad/Pocket features. If native construction is technically impractical, record construction_exception in design_record and disclose the limitation. The accepted model is unchanged.")
+        return
     facts, _ = _measure(doc, request)
-    record.update(ok=True, facts=facts.to_dict(), bottom_opening=_bottom_opening(main.Shape, facts),
+    facts.feature_tree["verified_parameters"] = len(health["changed_parameters"]) if health["level"] == "E3" else 0
+    from ai_freecad_core.ai_master.fact_layer import finish_report
+    finish_report(facts, None)
+    main, objects = _main_shape(doc)
+    record.update(ok=True, health=health, facts=facts.to_dict(), bottom_opening=_bottom_opening(main.Shape, facts),
                   renders=_render(doc, [o for o in objects if getattr(o, "Visibility", True)] or objects, request["render_out"], ["iso"], False) if request.get("render_out") else [])
+
+
+def _job_health(request, record):
+    from integrations.ai_master.parametric_checks import verify_saved
+    doc, _ = _open_any(request["source_path"])
+    doc, health = verify_saved(doc, request["result_path_fcstd"])
+    facts, _ = _measure(doc, request)
+    record.update(ok=True, health=health, facts=facts.to_dict())
 
 
 def main() -> int:
@@ -636,7 +666,7 @@ def main() -> int:
     try:
         {"build": _job_build, "render": _job_render, "living_test": _job_living_test, "export": _job_export, "adopt": _job_adopt,
          "section": _job_section, "set_parameters": _job_set_parameters, "edit_existing": _job_edit_existing,
-         "reshape_rings": _job_reshape_rings}[request["action"]](request, record)
+         "reshape_rings": _job_reshape_rings, "health": _job_health}[request["action"]](request, record)
     except Exception as error:  # noqa: BLE001
         record.update(ok=False, error=f"{type(error).__name__}: {error}", worker_traceback=traceback.format_exc())
     record["seconds"] = round(time.perf_counter() - started, 2)
