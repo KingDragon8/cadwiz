@@ -66,7 +66,7 @@ def test_the_button_never_closes_the_claude_app() -> None:
         assert closing not in source, closing
 
 
-def test_chatgpt_chosen_connect_opens_the_chatgpt_app_not_claude() -> None:
+def test_openai_chosen_connect_opens_codex_not_claude() -> None:
     # ORDER-2026-10-21-01: CADWiz works with Claude or ChatGPT; Connect opens the one chosen.
     asked: list[str] = []
     opened: list[str] = []
@@ -77,7 +77,7 @@ def test_chatgpt_chosen_connect_opens_the_chatgpt_app_not_claude() -> None:
 
     connector = connect_claude.Connector(ask=ask, opener=opened.append, clock=_Clock(), app="chatgpt")
     connector.thread.join(5)
-    assert asked == ["chatgpt"] and opened == ["OpenAI.Codex_x!App"] and "ChatGPT" in connector.words
+    assert asked == ["chatgpt"] and opened == ["OpenAI.Codex_x!App"] and "Codex" in connector.words
 
 
 def test_whichever_is_open_waits_for_a_running_chatgpt_and_opens_nothing() -> None:
