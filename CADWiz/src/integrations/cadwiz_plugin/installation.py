@@ -143,7 +143,10 @@ def rollback(manifest_path: Path) -> dict:
         name = old.name.casefold()
         if name not in ('cadwiz', 'ai-freecad') and not name.startswith(('cadwiz.backup', 'cadwiz-backup', 'cadwiz.old')):
             raise ValueError('Rollback may only restore CADWiz installation folders.')
-        if (old != target and old.exists()) or hashes(saved) != record['hashes']:
+        # macOS uses PosixPath even on case-insensitive APFS: unequal strings
+        # can identify the same directory. WindowsPath equality hid this bug.
+        occupied = old.exists() and not old.samefile(target)
+        if occupied or hashes(saved) != record['hashes']:
             raise ValueError('A backup or destination changed; all files preserved.')
     lock = user_data / '.cadwiz-install.lock'
     fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
