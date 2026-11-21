@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+"""Real macOS CI runner acceptance. Never run against an owner's profile.
+
+This starts isolated, disposable FreeCAD GUIs on a CI desktop only. It does not
+claim to be Neil's Mac or verify interactive assistant account enrollment.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import zipfile
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--app', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--case-parent', type=Path)
+    args = parser.parse_args()
+    assert sys.platform == 'darwin' and os.environ.get('CI') == 'true', 'Isolated macOS CI only'
+    repo = Path(__file__).resolve().parents[2]
+    out = args.output.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    if args.case_parent:
+        assert args.case_parent.resolve().is_relative_to(Path(os.environ['RUNNER_TEMP']).resolve())
+    qa = Path(tempfile.mkdtemp(prefix='CADWiz Mac QA ', dir=args.case_parent))
+    profile = qa/'FreeCAD Profile'
+    profile.mkdir()
+    env = dict(os.environ, FREECAD_USER_HOME=str(profile), FREECAD_USER_DATA=str(profile),
+               CADWIZ_SETTINGS_FILE=str(qa/'settings.json'), CADWIZ_SETUP_DIR=str(qa/'helper'),
+               CADWIZ_PLUGIN_BRIDGE='off', CADWIZ_CLIENT_APP='auto')
+    python = next(p for p in (args.app/'Contents/Resources/bin/python', args.app/'Contents/Resources/bin/python3') if p.is_file())
+    modules = [p for p in args.app.rglob('FreeCAD*.so')
+               if p.name == 'FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
+    assert len(modules) == 1, f'Expected one FreeCAD module in bundle: {modules}'
+    env['PYTHONPATH'] = str(modules[0].parent)
+    gui = args.app/'Contents/MacOS/FreeCAD'
+    def run(command):
+        result = subprocess.run(list(map(str, command)), env=env, capture_output=True, text=True, timeout=180)
+        with (out/'commands.log').open('a') as log:
+            log.write(result.stdout + result.stderr + '\n')
+        assert result.returncode == 0, (command, result.stdout[-2000:], result.stderr[-2000:])
+        return result.stdout
+    reported = run([python, '-c', 'import FreeCAD; print("CADWIZ_DATA="+FreeCAD.getUserAppDataDir())'])
+    data = Path(next(line.split('=', 1)[1] for line in reported.splitlines() if line.startswith('CADWIZ_DATA=')))
+    assert data.resolve().is_relative_to(qa.resolve()), 'Refusing non-isolated FreeCAD profile'
+    mod = data/'Mod'
+    case_probe = qa/'CaseProbe'
+    case_probe.write_text('case check')
+    case_sensitive = not (qa/'caseprobe').exists()
+    results = []
+    def save_results():
+        (out/'acceptance.json').write_text(json.dumps({'platform': 'real macOS CI runner',
+            'case_sensitive': case_sensitive, 'tests': results}, indent=2))
+    def install():
+        run(['bash', repo/'scripts/install_macos.sh'])
+        assert (mod/'CADWiz/InitGui.py').is_file()
+    env['FREECAD_PY'] = str(python)
+    def startup(label, offline=False):
+        result_file = out/(label+'.json')
+        macro = qa/(label+'.FCMacro')
+        macro.write_text('''import json
+from pathlib import Path
+import FreeCAD, FreeCADGui, traceback
+from PySide import QtCore, QtWidgets
+def finish():
+    window = FreeCADGui.getMainWindow()
+    result = {}
+    try:
+        found = 'CADWizWorkbench' in FreeCADGui.listWorkbenches()
+        if found:
+            FreeCADGui.activateWorkbench('CADWizWorkbench')
+        dock = window.findChild(QtWidgets.QDockWidget, 'AI_FreeCAD_Status_Dock')
+        import integrations.cadwiz_plugin as plugin
+        result = dict(workbench_registered=found, panel_visible=bool(dock and dock.isVisible()),
+                      freecad_version=FreeCAD.Version()[:3], cadwiz_version=plugin.CADWIZ_VERSION,
+                      loaded_source=str(Path(plugin.__file__).resolve().parents[3]))
+    except Exception:
+        result['error'] = traceback.format_exc()
+    finally:
+        Path(RESULT).write_text(json.dumps(result, indent=2))
+        window.close()
+QtCore.QTimer.singleShot(12000, finish)
+'''.replace('RESULT', repr(str(result_file))))
+        command = [gui, macro]
+        if offline:
+            command = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)', *command]
+        run(command)
+        record = json.loads(result_file.read_text())
+        assert record['workbench_registered'] and record['panel_visible'], record
+        assert record['cadwiz_version'] == '0.9.2', record
+        assert Path(record['loaded_source']).samefile(mod/'CADWiz'), record
+        results.append({'test': label, 'status': 'PASS', **record})
+        save_results()
+    install()
+    startup('clean-install')
+    startup('restart-2')
+    startup('restart-3')
+    # Test an actual prior committed release, not just a directory labelled old.
+    archive = qa/'old.zip'
+    run(['git', '-C', repo, 'archive', '--format=zip', '--output='+str(archive), 'v0.9.1', 'CADWiz'])
+    with zipfile.ZipFile(archive) as package:
+        package.extractall(qa/'old')
+    # Keep current disposable install outside Mod too.
+    (mod/'CADWiz').rename(qa/'clean-before-upgrade')
+    shutil.copytree(qa/'old/CADWiz', mod/'cadwiz')
+    (mod/'cadwiz/owner-fixture.FCStd').write_bytes(b'preserve owner fixture')
+    install()
+    startup('upgrade-091')
+    assert any(p.read_bytes() == b'preserve owner fixture' for p in (data/'CADWiz-backups').rglob('owner-fixture.FCStd'))
+    (mod/'CADWiz').rename(qa/'before-nested')
+    shutil.copytree(qa/'old/CADWiz', mod/'cadwiz/cadwiz-release-0.9.1/CADWiz')
+    (mod/'cadwiz/.git').mkdir()
+    shutil.copytree(qa/'old/CADWiz', mod/'cadwiz.backup.interrupted')
+    install()
+    startup('neil-nested-recovery')
+    # Optional setup failures are forced in the installed code in this QA profile.
+    setup = mod/'CADWiz/src/integrations/cadwiz_plugin/setup_startup.py'
+    setup_source = setup.read_text()
+    setup.write_text('raise ImportError("forced optional setup dependency failure")\n')
+    startup('optional-setup-failure-no-ai')
+    setup.write_text(setup_source)
+    # Confirm the process sandbox really denies socket access, then launch the
+    # real GUI in that same sandbox. The CI runner itself remains connected.
+    proof = ('import socket, errno\ntry:\n socket.create_connection(("127.0.0.1",9),timeout=1)\n'
+             'except OSError as e:\n assert e.errno in (errno.EPERM,errno.EACCES),repr(e)\n'
+             'else:\n raise AssertionError("network sandbox did not deny access")\n')
+    run(['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)', python, '-c', proof])
+    startup('network-denied-startup', offline=True)
+    results.append({'test': 'Neil physical Mac and interactive assistant connection', 'status': 'NOT VERIFIED'})
+    save_results()
+
+
+if __name__ == '__main__':
+    main()

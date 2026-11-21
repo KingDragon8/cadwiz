@@ -57,7 +57,7 @@ available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**Beta 0.9.1.** Opens AI Wiz Setup in FreeCAD and separates setup from connection management. See [0.9.1 changes](docs/RELEASE-NOTES-0.9.1.md).
+**Beta 0.9.2.** Opens AI Wiz Setup in FreeCAD and separates setup from connection management. See [0.9.2 changes](docs/RELEASE-NOTES-0.9.2.md).
 and the Free AIWiz features from 0.8.8.
 
 - **Works:** seeing and measuring your model; building and editing parts as
@@ -90,8 +90,26 @@ Linux x64 with FreeCAD Python 3.11.
 
 
 1. Follow the illustrated guide at [cadwiz.app/download](https://cadwiz.app/download).
-2. On Windows, download and open **CADWiz Setup.exe**, confirm the detected FreeCAD, then click **Install CADWiz**. On macOS/Linux, use the Addon Manager instructions on the download page.
+2. On Windows, download and open **CADWiz Setup.exe**, confirm the detected FreeCAD, then click **Install CADWiz**. For this macOS/Linux recovery candidate, extract the complete ZIP and use the workbench-only installer described below. Production downloads remain at the prior verified release until acceptance passes.
 3. Choose **Add to Claude** or **Connect ChatGPT / Codex** in CADWiz; ask your desktop assistant what's open in FreeCAD.
+
+### 0.9.2 Mac recovery candidate — not yet a verified release
+
+Save work and quit FreeCAD. Extract the complete ZIP in Downloads, then run
+`Install-CADWiz.command` (or `bash scripts/install_macos.sh` from the extracted
+folder). A custom app can be selected with `FREECAD_APP='/path/FreeCAD.app'`.
+On Linux use `bash scripts/install.sh`; custom runtimes use `FREECAD_PY`.
+The selected FreeCAD supplies the actual user directory. The installer does not
+use Git, pip or assistant configuration, and stops rather than guessing when
+multiple runtimes are found. It preserves previous installs outside Mod and
+prints a rollback manifest. Restart FreeCAD, select CADWiz and confirm its panel;
+repeat the restart twice before considering the repair verified. Configure your
+assistant through AI Wiz Setup afterward. A copied folder is not a startup test.
+
+See [0.9.2 findings, verification gates and rollback](docs/RELEASE-NOTES-0.9.2.md).
+Neil's physical Mac and full platform acceptance are **NOT VERIFIED** until
+recorded evidence demonstrates otherwise. Do not merge or publish this candidate
+as a successful fix on the strength of simulated filesystem tests alone.
 
 Windows is checked in isolation. Mac helper bundles are included but real-device installation is unverified. Offline helpers target FreeCAD Python 3.11. No paid service is called by installation tests.
 

@@ -79,6 +79,20 @@ def main():
     assert Path(receipt['mod_dir']).samefile(profile / 'Mod'), (receipt['mod_dir'], str(profile / 'Mod'))
     assert receipt['freecad_version'] == '1.1.4', receipt['freecad_version']
     assert len(list(menu.glob('*.lnk'))) == 2 and len(list(desktop.glob('*.lnk'))) == 1
+    inspect_links = qa / 'inspect-shortcuts.ps1'
+    inspect_links.write_text('param([string]$Menu,[string]$Desktop)\n'
+        '$s=New-Object -ComObject WScript.Shell\n'
+        '$items=@(Get-ChildItem -LiteralPath $Menu -Filter *.lnk)+@(Get-ChildItem -LiteralPath $Desktop -Filter *.lnk)\n'
+        '@($items | ForEach-Object { $l=$s.CreateShortcut($_.FullName); '
+        '@{path=$_.FullName;target=$l.TargetPath;arguments=$l.Arguments;icon=$l.IconLocation} }) | ConvertTo-Json -Compress\n')
+    run('shortcut-branding', ['powershell.exe', '-NoProfile', '-File', str(inspect_links),
+                             '-Menu', str(menu), '-Desktop', str(desktop)])
+    links = json.loads((args.output / 'shortcut-branding.txt').read_text(encoding='utf8'))
+    assert len(links) == 3
+    for link in links:
+        assert Path(link['target']).samefile(args.freecad_bin / 'pythonw.exe'), link
+        assert Path(link['icon'].rsplit(',', 1)[0]).samefile(Path(receipt['addon']) / 'Resources/icons/cadwiz.ico'), link
+        assert str(data / 'windows_wizard.py') in link['arguments'], link
     run('graphical-uninstaller-dependencies', [str(args.freecad_bin / 'python.exe'),
                                              str(data / 'windows_wizard.py'), '--qt-check', '--yes'])
     (profile / 'Mod/CADWiz/owner-model.FCStd').write_bytes(b'PRIVATE FIXTURE PRESERVE ME')

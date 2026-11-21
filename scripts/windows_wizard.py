@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import sys
 
-VERSION = '0.9.1'
+VERSION = '0.9.2'
 REGISTRY = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\CADWiz'
 
 
@@ -155,12 +155,13 @@ def perform(args):
     if not (bin_dir / 'pythonw.exe').is_file():
         raise RuntimeError('FreeCAD pythonw.exe is missing. Repair FreeCAD, then try again.')
     manager = data / 'windows_wizard.py'
+    icon = str(mod / 'CADWiz/Resources/icons/cadwiz.ico') + ',0'
     command = '"' + str(manager) + '" --remove'
     menu = Path(args.start_menu)
     specs = [dict(path=str(menu / 'CADWiz.lnk'), target=str(bin_dir / 'pythonw.exe'), arguments='"' + str(manager) + '" --open',
-                  working_directory=str(bin_dir), description='Open FreeCAD with CADWiz'),
+                  working_directory=str(bin_dir), description='Open FreeCAD with CADWiz', icon=icon),
              dict(path=str(menu / 'Uninstall CADWiz.lnk'), target=str(bin_dir / 'pythonw.exe'), arguments=command,
-                  working_directory=str(data), description='Uninstall CADWiz; keep models and preferences')]
+                  working_directory=str(data), description='Uninstall CADWiz; keep models and preferences', icon=icon)]
     if args.desktop:
         specs.append(dict(specs[0], path=str(Path(args.desktop) / 'CADWiz.lnk')))
     receipt = backend.install(Path(args.source), info, mod, data, specs, commit=registry_commit)
