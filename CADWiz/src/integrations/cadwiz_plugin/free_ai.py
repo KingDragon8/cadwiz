@@ -302,7 +302,7 @@ class FreeAIPage:
     def refresh(self) -> None:
         bridge = self.panel.bridge()
         lines = []
-        for app, name in (("claude", "Claude"), ("chatgpt", "ChatGPT / Codex")):
+        for app, name in (("claude", "Claude"), ("chatgpt", "OpenAI / Codex")):
             connected = bool(bridge is not None and hasattr(bridge, "connected_to") and bridge.connected_to(app))
             lines.append(f"{name}: " + ("Ready — app assisted" if connected else "Not connected"))
         self.apps.setText("\n".join(lines) + "\nUsage and eligibility depend on your account. "

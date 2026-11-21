@@ -48,15 +48,11 @@ def usage_lines(rows: list[dict[str, Any]]) -> list[str]:
     return [CLAUDE_USAGE_LINE]
 
 
-CHATGPT_CONNECTED = "ChatGPT connected"
-CHATGPT_NOT_CONNECTED = "ChatGPT not connected"
-CHATGPT_TODO = ("Open the ChatGPT desktop app (for Windows and Mac, signed in with your ChatGPT "
-                "account) -- this turns green by itself within 30 seconds. If CADWiz isn't in its settings yet, run "
-                "CADWiz's installer again.")
-CODEX_STEPS = ("To use ChatGPT: install the ChatGPT desktop app (chatgpt.com/download), sign in with your ChatGPT "
-               "account, then run CADWiz's installer again -- it adds CADWiz to the app's settings (its MCP servers, "
-               "in .codex/config.toml). Choose ChatGPT under Talk to; the ChatGPT light turns green only when the "
-               "app has really connected.")
+CHATGPT_CONNECTED = "Codex connected"
+CHATGPT_NOT_CONNECTED = "Codex not connected"
+CHATGPT_TODO = ("Open Codex on this computer and ask what is open in FreeCAD. If you just connected, fully quit and reopen Codex first.")
+CODEX_STEPS = ("Open AIWiz, choose AI Wiz Setup, then OpenAI to connect Codex. ChatGPT and Codex are different apps. "
+               "Your existing account permissions and limits apply.")
 
 
 def ai_lights(bridge: Any, choice: str) -> list[dict[str, str]]:

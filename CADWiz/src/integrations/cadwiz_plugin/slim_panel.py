@@ -74,7 +74,7 @@ NOT_CONNECTED = "Not connected"
 # The one founder action that fixes a red light with the app already open is quitting it
 # fully: an app that was running when CADWiz was installed never read its new settings
 # (ORDER-2026-10-23-02). So the red line says that, not only "press Connect".
-NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or the ChatGPT app); this turns green by itself "
+NOT_CONNECTED_TODO = ("Open your assistant app on this PC (Claude Desktop, or Codex); this turns green by itself "
                       "within 30 seconds. Still red with the app open? Quit the app fully -- right-click its icon by the clock, "
                       "then Quit -- and open it again.")
 #: How long after FreeCAD opens the light waits (amber) for the first check-in.
@@ -136,8 +136,8 @@ def _button(QtWidgets: Any, key: str, parent: Any) -> Any:
 
 def assistant_word(ai_app: str) -> str:
     """The name on the Show button for the assistant chosen at the top of the panel
-    (ORDER-2026-10-21-01: CADWiz works with Claude or ChatGPT; neither is the default)."""
-    return {"claude": "Claude", "chatgpt": "ChatGPT"}.get(str(ai_app), "assistant")
+    (ORDER-2026-10-21-01: CADWiz works with Claude or Codex; neither is the default)."""
+    return {"claude": "Claude", "chatgpt": "Codex"}.get(str(ai_app), "assistant")
 
 
 def run_freecad_command(command: str) -> None:
@@ -690,7 +690,7 @@ class _Panel:
         self.connect_button = QtWidgets.QPushButton("Connect", header)
         self.connect_button.setObjectName("CADWiz_Connect")
         self.connect_button.setProperty("role", "primary")
-        self.connect_button.setToolTip("Connect your assistant: opens the app chosen under Talk to (Claude or ChatGPT) if it is closed, then waits for it to check in")
+        self.connect_button.setToolTip("Connect your assistant: opens the app chosen under Talk to (Claude or Codex) if it is closed, then waits for it to check in")
         self.connect_button.clicked.connect(self.connect_claude)
         self.connect_button.hide()
         self.connector = None

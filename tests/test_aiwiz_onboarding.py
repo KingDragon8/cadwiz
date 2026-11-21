@@ -28,3 +28,17 @@ def test_live_connection_is_verified_per_assistant(tmp_path):
     assert connected_apps(bridge) == ['Claude Desktop']
     assert landing_tab(tmp_path / 'missing.json', bridge) == 1
     assert connected_apps(SimpleNamespace(connected=True)) == []
+
+
+def test_openai_app_lookup_targets_codex_identity(monkeypatch):
+    from integrations.cadwiz_plugin import connect_claude
+    calls = []
+    def run(args, **kwargs):
+        calls.append(args)
+        return SimpleNamespace(stdout='running=False\nappid=OpenAI.Codex_example!App\n')
+    monkeypatch.setattr(connect_claude.subprocess, 'run', run)
+    result = connect_claude.ask_windows('chatgpt')
+    assert result['appid'] == 'OpenAI.Codex_example!App'
+    assert "OpenAI.Codex*!*" in calls[0][-1]
+    assert "Name -eq 'ChatGPT'" not in calls[0][-1]
+    assert connect_claude.APPS['chatgpt']['start'] == 'Codex'
