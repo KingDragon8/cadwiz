@@ -103,9 +103,11 @@ failure, concurrent-install refusal and changed-file rollback refusal.
 
 The Mac CI job downloads a checksum-verified official FreeCAD and attempts real
 workbench/panel startup and restarts in disposable CI profiles. Its actual
-results must be reviewed; adding a workflow is not a passing test. It does not
-prove Neil's physical Mac, customer assistant enrollment, disconnected-network
-behavior or both APFS case modes. Unavailable acceptance remains NOT VERIFIED.
+results must be reviewed; adding a workflow is not a passing test. The extended
+job also attempts network-denied GUI startup and a case-sensitive APFS volume;
+only recorded passing results establish those gates. It cannot prove Neil's
+physical Mac or customer assistant enrollment. Unavailable acceptance remains
+NOT VERIFIED.
 
 Windows installer lifecycle, Linux native load checks, cross-platform connector
 handshake and the new recovery suite remain required regression gates. The
