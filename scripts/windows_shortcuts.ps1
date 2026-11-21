@@ -9,5 +9,6 @@ foreach($item in @($items)) {
     $link.Arguments=[string]$item.arguments
     $link.WorkingDirectory=[string]$item.working_directory
     $link.Description=[string]$item.description
+    if ($item.icon) { $link.IconLocation=[string]$item.icon }
     $link.Save()
 }
