@@ -83,6 +83,12 @@ NO_BRIDGE = "Not connected — CADWiz's plug-in did not start; close and reopen 
 NO_BRIDGE_TODO = "Close FreeCAD and open it again. If the light stays red, open Setup below."
 NO_PICTURE = "A picture of the model appears here after your assistant builds or changes it."
 NO_MODEL = "Open or create a model in FreeCAD and it appears here, in any workbench."
+COMMUNICATION_TITLE = "Wiz communication screen"
+COMMUNICATION_GUIDANCE = (
+    "Use the quick buttons above to control the model.\n\n"
+    "Use the tools below to point to and mark things in this communication screen "
+    "so you can explain to your AI partner what you want done."
+)
 FROZEN = "Frozen. Now tell your assistant what you mean, in its app."
 CLAUDE_HAS_IT = "Your assistant has it"
 
@@ -708,9 +714,6 @@ class _Panel:
         setup_actions.addWidget(self.connect_button)
         setup_actions.addWidget(self.undo_connection_button)
         setup_actions.addWidget(self.manual_connection_button)
-        help_button = QtWidgets.QPushButton("Get help", header)
-        help_button.clicked.connect(self.connection_help)
-        setup_actions.addWidget(help_button)
         setup_actions.addStretch(1)
         info.addLayout(setup_actions)
         row.addLayout(info, 1)
@@ -1894,6 +1897,16 @@ def _make_canvas(QtCore: Any, QtGui: Any, QtWidgets: Any) -> Any:
             self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
             self.setMouseTracking(True)
             self.setAccessibleName("CADWiz Visual Communications Screen")
+            self.empty_hint = QtWidgets.QTextBrowser(self)
+            self.empty_hint.setObjectName('CADWiz_Communication_Guidance')
+            self.empty_hint.setFrameShape(QtWidgets.QFrame.NoFrame)
+            self.empty_hint.setStyleSheet('QTextBrowser { background: white; color: #5A6270; border: none; }')
+            self.empty_hint.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            hint_font = QtGui.QFont('Arial')
+            hint_font.setPixelSize(TEXT_PX)
+            self.empty_hint.setFont(hint_font)
+            self.empty_hint.hide()
+            self.empty_hint_key = None
             self.compare_bar = QtWidgets.QWidget(self)
             row = QtWidgets.QHBoxLayout(self.compare_bar)
             row.setContentsMargins(8, 8, 8, 8)
@@ -2008,12 +2021,21 @@ def _make_canvas(QtCore: Any, QtGui: Any, QtWidgets: Any) -> Any:
             font.setPixelSize(TEXT_PX)
             painter.setFont(font)
             compare = panel.compare
+            if compare is not None or panel.picture is not None:
+                self.empty_hint.hide()
             if compare is not None:
                 self._paint_compare(painter, compare)
             elif panel.picture is None:
                 painter.setPen(QtGui.QColor("#5A6270"))
-                painter.drawText(self.rect().adjusted(24, 24, -24, -24), QtCore.Qt.AlignCenter | QtCore.Qt.TextWordWrap,
-                                 NO_MODEL if panel.document() is None else NO_PICTURE)
+                empty_model = panel.document() is None
+                if self.empty_hint_key != empty_model:
+                    self.empty_hint_key = empty_model
+                    intro = NO_MODEL if empty_model else NO_PICTURE
+                    self.empty_hint.setHtml(
+                        '<div align="center"><p style="font-size:22px"><b>' + COMMUNICATION_TITLE + '</b></p>'
+                        '<p>' + intro + '</p><p>' + COMMUNICATION_GUIDANCE.replace('\n\n', '</p><p>') + '</p></div>')
+                self.empty_hint.setGeometry(self.rect().adjusted(18, 12, -18, -12))
+                self.empty_hint.show()
             else:
                 rect = self.picture_rect()
                 painter.drawPixmap(rect, panel.picture, QtCore.QRectF(panel.picture.rect()))

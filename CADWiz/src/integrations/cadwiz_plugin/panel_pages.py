@@ -725,11 +725,15 @@ class SetupPage:
         buttons = QtWidgets.QHBoxLayout()
         buttons.addWidget(report)
         buttons.addWidget(get_help)
-        doctor = QtWidgets.QPushButton("CADWiz Doctor", help_box)
+        doctor = QtWidgets.QPushButton("Check Installation", help_box)
         doctor.setObjectName("CADWiz_Doctor")
         doctor.setToolTip("Offline installation checks. No repairs, uploads or new FreeCAD windows.")
         doctor.clicked.connect(self.run_doctor)
         buttons.addWidget(doctor)
+        repair = QtWidgets.QPushButton('Repair CADWiz', help_box)
+        repair.setObjectName('CADWiz_Repair_Installation')
+        repair.clicked.connect(self.repair_installation)
+        buttons.addWidget(repair)
         x_col.addLayout(buttons)
         ai_help = QtWidgets.QPushButton("Copy instructions for my assistant", help_box)
         ai_help.setObjectName("CADWiz_Copy_AI_Help")
@@ -1118,12 +1122,32 @@ class SetupPage:
             getter = getattr(session.app, "getUserAppDataDir", None)
             if callable(getter):
                 user_data = Path(getter())
-        result = inspect(user_data)
-        lines = ["CADWiz Doctor — offline, read-only", *result["issues"]]
+        runtime = None
+        if session is not None:
+            gui = import_module('FreeCADGui')
+            bridge = self.panel.bridge()
+            runtime = {'freecad_version': '.'.join(session.app.Version()[:3]),
+                       'workbench_registered': 'CADWizWorkbench' in gui.listWorkbenches(),
+                       'panel_open': self.panel.full.isVisible(),
+                       'assistant_connected': bool(getattr(bridge, 'connected', False))}
+        result = inspect(user_data, include_paths=True, runtime=runtime)
+        lines = ["CADWiz Doctor — offline, read-only (local paths; review before sharing)",
+                 json.dumps(result['runtime'], indent=2), *result["issues"]]
         for item in result["installations"]:
+            lines.append(f"{item['directory']} — {item['version']} — {item['method']}")
             lines.extend(item["problems"])
+        lines.append(f"Rollback records: {result['rollback_records']}")
         lines.append(result["next_action"])
         self.report_result.setText("\n".join(lines))
+
+    def repair_installation(self) -> None:
+        self.run_doctor()
+        self.report_result.setText(self.report_result.text() + '\n\nRepair CADWiz: Save your work and quit FreeCAD completely. '
+            'Extract the complete 0.9.2 release ZIP. On Mac, run Install-CADWiz.command (or bash scripts/install_macos.sh). '
+            'On Linux run bash scripts/install.sh with the selected FreeCAD Python. On Windows rerun Setup.exe. '
+            'The Mac/Linux repair stages and verifies files, preserves old installations outside Mod, and prints a rollback manifest. '
+            'It does not configure AI accounts. Restart FreeCAD, select CADWiz, verify its panel, then use AI Wiz Setup. '
+            'No repair runs while this FreeCAD window is open.')
 
     def get_help(self) -> None:
         from integrations.cadwiz_plugin.error_report import load_report

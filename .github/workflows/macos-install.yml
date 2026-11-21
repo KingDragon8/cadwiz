@@ -1,0 +1,39 @@
+name: Mac installation acceptance
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mac-freecad:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download and verify official FreeCAD
+        shell: bash
+        run: |
+          base=https://github.com/FreeCAD/FreeCAD/releases/download/1.1.4
+          arch=$(uname -m)
+          file=FreeCAD_1.1.4-macOS-${arch}-py311.dmg
+          curl -fL "$base/$file" -o "$RUNNER_TEMP/$file"
+          curl -fL "$base/$file-SHA256.txt" -o "$RUNNER_TEMP/checksums.txt"
+          cd "$RUNNER_TEMP"
+          expected=$(awk '{print $1; exit}' checksums.txt)
+          actual=$(shasum -a 256 "$file" | awk '{print $1}')
+          test "$expected" = "$actual"
+          mkdir -p "$RUNNER_TEMP/freecad-dmg"
+          hdiutil attach "$file" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/freecad-dmg"
+          app=$(find "$RUNNER_TEMP/freecad-dmg" -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$app"
+          ditto "$app" "$RUNNER_TEMP/FreeCAD.app"
+          hdiutil detach "$RUNNER_TEMP/freecad-dmg"
+      - name: Clean install, upgrade, recovery and real GUI restarts
+        run: python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output mac-acceptance
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-native-install-acceptance
+          path: mac-acceptance/

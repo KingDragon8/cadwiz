@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 
-def inspect(user_data: Path | None = None) -> dict[str, Any]:
+def inspect(user_data: Path | None = None, *, include_paths: bool = False, runtime: dict | None = None) -> dict[str, Any]:
     roots = [user_data / "Mod"] if user_data else candidate_mod_dirs()
     installs = []
     issues = []
@@ -40,7 +40,9 @@ def inspect(user_data: Path | None = None) -> dict[str, Any]:
                 if (folder / "InitGui.py").is_file() or (folder / "CADWiz/InitGui.py").is_file():
                     loadable_backups += 1
                 continue
-            addon = folder / "CADWiz" if (folder / "CADWiz").is_dir() else folder
+            found = [p.parent for pattern in ('InitGui.py', 'CADWiz/InitGui.py', '*/CADWiz/InitGui.py')
+                     for p in folder.glob(pattern)]
+            addon = found[0] if found else folder
             init = addon / "InitGui.py"
             problems = []
             if not init.is_file():
@@ -52,8 +54,24 @@ def inspect(user_data: Path | None = None) -> dict[str, Any]:
                     problems.append("Startup file cannot be read or parsed.")
             if not (addon / "src/integrations/cadwiz_plugin/addon.py").is_file():
                 problems.append("Panel source is missing or this is a development link install.")
-            installs.append({"candidate": len(installs) + 1, "files_checked": True,
-                             "problems": problems})
+            if len(found) > 1:
+                problems.append('Multiple workbench roots exist inside this installation.')
+            if addon != folder and addon.parent != folder:
+                problems.append('Nested release directory found; use the workbench-only repair installer.')
+            version = 'unknown'
+            try:
+                tree = ast.parse((addon / 'src/integrations/cadwiz_plugin/__init__.py').read_text(encoding='utf-8-sig'))
+                for node in tree.body:
+                    if isinstance(node, ast.Assign) and any(isinstance(n, ast.Name) and n.id == 'CADWIZ_VERSION' for n in node.targets):
+                        version = ast.literal_eval(node.value)
+            except (OSError, ValueError, SyntaxError):
+                pass
+            item = {"candidate": len(installs) + 1, "files_checked": True, 'version': version,
+                    'method': 'repository-layout' if addon == folder / 'CADWiz' else 'manual' if addon == folder else 'nested-or-incomplete',
+                    "problems": problems}
+            if include_paths:
+                item['directory'] = str(addon)
+            installs.append(item)
     if loadable_backups:
         issues.append("Backup add-ons still contain startup code inside Mod and may also load. Preserve them; review a move outside Mod before repairing.")
     if not installs:
@@ -62,17 +80,31 @@ def inspect(user_data: Path | None = None) -> dict[str, Any]:
         issues.append("Multiple candidate installations found; preserve them and identify the active one in FreeCAD.")
     if not user_data:
         issues.append("Active FreeCAD add-on directory is unverified. Obtain FreeCAD.getUserAppDataDir() from the running instance.")
-    missing = [name for name in ("mcp",) if importlib.util.find_spec(name) is None]
+    missing = []
+    for name in ('mcp',):
+        try:
+            available = importlib.util.find_spec(name) is not None
+        except (ImportError, ValueError):
+            available = False
+        if not available:
+            missing.append(name)
     if missing:
         issues.append("Connector dependency is unavailable in this Python; check again using FreeCAD's Python.")
     # A caller cannot turn a filesystem scan into proof of GUI activation.
-    return {"schema_version": 1, "system": platform.system(), "architecture": platform.machine(),
+    result = {"schema_version": 1, "system": platform.system(), "architecture": platform.machine(),
             "python": platform.python_version(), "offline": True, "read_only": True,
             "directory_confidence": "confirmed" if user_data else "undetermined",
             "installations": installs, "loadable_backups": loadable_backups,
             "issues": issues, "missing_dependencies": missing,
             "startup_verified": False, "ai_connection_verified": False,
             "next_action": "In the existing FreeCAD window, verify CADWiz opens and the connection works. No files were changed."}
+    manifests = list((user_data / 'CADWiz-backups').glob('*/rollback.json')) if user_data else []
+    result['rollback_records'] = len(manifests)
+    result['runtime'] = runtime or {'workbench_registered': 'NOT VERIFIED', 'panel_open': 'NOT VERIFIED',
+                                   'freecad_version': 'NOT VERIFIED', 'assistant_connected': 'NOT VERIFIED'}
+    if include_paths and user_data:
+        result['checked_user_data'] = str(user_data)
+    return result
 
 
 def candidate_mod_dirs() -> list[Path]:
@@ -94,8 +126,9 @@ def candidate_mod_dirs() -> list[Path]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--user-data", type=Path, help="FreeCAD.getUserAppDataDir() from your running FreeCAD")
+    parser.add_argument('--local-paths', action='store_true', help='Include local paths; review before sharing.')
     args = parser.parse_args()
-    print(json.dumps(inspect(args.user_data), indent=2))
+    print(json.dumps(inspect(args.user_data, include_paths=args.local_paths), indent=2))
     return 0
 
 
