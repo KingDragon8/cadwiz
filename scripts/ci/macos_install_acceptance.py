@@ -64,8 +64,10 @@ def finish():
     if found:
         FreeCADGui.activateWorkbench('CADWizWorkbench')
     dock = window.findChild(QtWidgets.QDockWidget, 'AI_FreeCAD_Status_Dock')
+    import integrations.cadwiz_plugin as plugin
     result = dict(workbench_registered=found, panel_visible=bool(dock and dock.isVisible()),
-                  freecad_version=FreeCAD.Version()[:3])
+                  freecad_version=FreeCAD.Version()[:3], cadwiz_version=plugin.CADWIZ_VERSION,
+                  loaded_source=str(Path(plugin.__file__).resolve().parents[3]))
     Path(RESULT).write_text(json.dumps(result, indent=2))
     FreeCADGui.getMainWindow().close()
 QtCore.QTimer.singleShot(12000, finish)
@@ -73,6 +75,8 @@ QtCore.QTimer.singleShot(12000, finish)
         run([gui, macro])
         record = json.loads(result_file.read_text())
         assert record['workbench_registered'] and record['panel_visible'], record
+        assert record['cadwiz_version'] == '0.9.2', record
+        assert Path(record['loaded_source']).samefile(mod/'CADWiz'), record
         results.append({'test': label, 'status': 'PASS', **record})
     install()
     startup('clean-install')

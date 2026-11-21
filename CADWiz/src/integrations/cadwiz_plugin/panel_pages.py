@@ -722,7 +722,8 @@ class SetupPage:
         get_help.clicked.connect(self.get_help)
         self.last_report_id = ""
         x_col.addWidget(self.report_note)
-        buttons = QtWidgets.QHBoxLayout()
+        from integrations.cadwiz_plugin.slim_panel import _make_flow_layout
+        buttons = _make_flow_layout(self.panel.QtCore, QtWidgets)(None, 6)
         buttons.addWidget(report)
         buttons.addWidget(get_help)
         doctor = QtWidgets.QPushButton("Check Installation", help_box)
