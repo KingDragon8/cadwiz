@@ -3,8 +3,18 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from .install_setup import atomic_write
+
+
+def desktop_route(app, platform=None):
+    platform = platform or sys.platform
+    if app == 'claude':
+        return ('Claude Desktop', 'https://claude.ai/download', platform != 'linux')
+    if platform == 'linux':
+        return ('Codex CLI', 'https://developers.openai.com/codex/cli/', True)
+    return ('Codex', 'https://developers.openai.com/codex/app/', True)
 
 
 def connected_apps(bridge):
@@ -60,7 +70,7 @@ class AIWizPage:
         self.stack.addWidget(choices)
         for key, title, description, button in (
             ('claude', 'Claude', 'Use Claude Desktop with your account.', 'Set up Claude'),
-            ('chatgpt', 'OpenAI', 'Use the Codex app with your OpenAI account.', 'Set up Codex'),
+            ('chatgpt', 'OpenAI', 'Use Codex with your OpenAI account.', 'Set up Codex'),
             ('free', 'Free AIWiz', 'Explore providers and check API access. Direct CAD requests are not enabled yet.', 'Explore free AI'),
             ('other', 'Other AI', 'Gemini, Grok or another AI: check current support before connecting.', 'Choose my AI'),
         ):
@@ -124,7 +134,14 @@ class AIWizPage:
         self.other.setVisible(not desktop)
         self.support.setVisible(not desktop)
         if desktop:
-            name = 'Claude Desktop' if route == 'claude' else 'Codex'
+            name, _url, supported = desktop_route(route)
+            if not supported:
+                self.detail_title.setText('Claude Desktop is not a Linux route')
+                self.detail_text.setText('Choose OpenAI / Codex to set up the supported local Codex CLI route on Linux. '
+                                         'A Claude website account alone does not connect to this computer.')
+                self.download.hide()
+                self.connect.hide()
+                return
             self.detail_title.setText('Let’s set up ' + name)
             self.detail_text.setText('1. If needed, get ' + name + ' from the official page below.\n'
                                      '2. Open it and sign in to your own account.\n'
@@ -149,8 +166,9 @@ class AIWizPage:
                              'Use Claude Desktop or Codex for the existing assistant connection routes.')
 
     def open_download(self):
-        url = ('https://claude.ai/download' if self.route == 'claude'
-               else 'https://developers.openai.com/codex/app/')
+        _name, url, supported = desktop_route(self.route)
+        if not supported:
+            return
         self.panel.QtGui.QDesktopServices.openUrl(self.panel.QtCore.QUrl(url))
 
     def connect_chosen(self):

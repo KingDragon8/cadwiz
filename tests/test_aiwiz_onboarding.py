@@ -1,7 +1,7 @@
 import json
 from types import SimpleNamespace
 import pytest
-from integrations.cadwiz_plugin.aiwiz import connected_apps, landing_tab
+from integrations.cadwiz_plugin.aiwiz import connected_apps, landing_tab, desktop_route
 
 
 @pytest.mark.parametrize('system', ['win32', 'darwin', 'linux'])
@@ -42,3 +42,11 @@ def test_openai_app_lookup_targets_codex_identity(monkeypatch):
     assert "OpenAI.Codex*!*" in calls[0][-1]
     assert "Name -eq 'ChatGPT'" not in calls[0][-1]
     assert connect_claude.APPS['chatgpt']['start'] == 'Codex'
+
+
+def test_linux_does_not_offer_a_nonexistent_claude_desktop_install():
+    assert desktop_route('claude', 'linux')[2] is False
+    assert desktop_route('chatgpt', 'linux') == ('Codex CLI', 'https://developers.openai.com/codex/cli/', True)
+    for platform in ('win32', 'darwin'):
+        assert desktop_route('claude', platform)[2] is True
+        assert desktop_route('chatgpt', platform)[0] == 'Codex'
