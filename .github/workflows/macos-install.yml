@@ -32,8 +32,17 @@ jobs:
           hdiutil detach "$RUNNER_TEMP/freecad-dmg"
       - name: Clean install, upgrade, recovery and real GUI restarts
         run: python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output mac-acceptance
+      - name: Repeat on case-sensitive APFS
+        shell: bash
+        run: |
+          hdiutil create -size 1g -fs 'Case-sensitive APFS' -volname CADWizCaseQA -type SPARSE -o "$RUNNER_TEMP/cadwiz-case.sparseimage"
+          mkdir -p "$RUNNER_TEMP/cadwiz-case-volume"
+          hdiutil attach "$RUNNER_TEMP/cadwiz-case.sparseimage" -nobrowse -mountpoint "$RUNNER_TEMP/cadwiz-case-volume"
+          python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --case-parent "$RUNNER_TEMP/cadwiz-case-volume" --output mac-acceptance-sensitive
+          python3 -c "import json; assert json.load(open('mac-acceptance-sensitive/acceptance.json'))['case_sensitive']"
+          hdiutil detach "$RUNNER_TEMP/cadwiz-case-volume"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mac-native-install-acceptance
-          path: mac-acceptance/
+          path: mac-acceptance*/
