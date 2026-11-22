@@ -32,7 +32,7 @@ def main():
     profile.mkdir()
     env = dict(os.environ, FREECAD_USER_HOME=str(profile), FREECAD_USER_DATA=str(profile),
                CADWIZ_SETTINGS_FILE=str(qa/'settings.json'), CADWIZ_SETUP_DIR=str(qa/'helper'),
-               CADWIZ_PLUGIN_BRIDGE='off', CADWIZ_CLIENT_APP='auto')
+               CADWIZ_PLUGIN_BRIDGE='off', CADWIZ_CLIENT_APP='auto', LOCALAPPDATA=str(qa/'plugin-data'))
     python = next(p for p in (args.app/'Contents/Resources/bin/python', args.app/'Contents/Resources/bin/python3') if p.is_file())
     modules = [p for p in args.app.rglob('FreeCAD*.so')
                if p.name == 'FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
@@ -81,13 +81,16 @@ def finish():
         title = window.findChild(QtWidgets.QLabel, 'CADWiz_Communication_Title')
         guidance = window.findChild(QtWidgets.QLabel, 'CADWiz_Communication_Guidance')
         aiwiz = window.findChild(QtWidgets.QTabWidget, 'CADWiz_AIWiz')
+        content = window.findChild(QtWidgets.QWidget, 'CADWiz_Slim_Panel')
+        panel = getattr(content, '_cadwiz_panel', None)
         import integrations.cadwiz_plugin as plugin
         result = dict(workbench_registered=found, panel_visible=bool(dock and dock.isVisible()),
                       freecad_version=FreeCAD.Version()[:3], cadwiz_version=plugin.CADWIZ_VERSION,
                       loaded_source=str(Path(plugin.__file__).resolve().parents[3]),
                       communication_title=title.text() if title else '',
                       guidance_present=bool(guidance and 'quick buttons above' in guidance.text()),
-                      aiwiz_tabs=[aiwiz.tabText(i) for i in range(aiwiz.count())] if aiwiz else [])
+                      aiwiz_tabs=[aiwiz.tabText(i) for i in range(aiwiz.count())] if aiwiz else [],
+                      restored_ai_choice=getattr(getattr(panel, 'free_ai', None), 'route', ''))
     except Exception:
         result['error'] = traceback.format_exc()
     finally:
@@ -105,10 +108,15 @@ QtCore.QTimer.singleShot(12000, finish)
         assert record['communication_title'] == 'Wiz communication screen' and record['guidance_present'], record
         assert record['aiwiz_tabs'] == ['AI Wiz Setup', 'AI Wiz Management'], record
         assert Path(record['loaded_source']).samefile(mod/'CADWiz'), record
+        if label != 'clean-install':
+            assert record['restored_ai_choice'] == 'codex_cli', record
         results.append({'test': label, 'status': 'PASS', **record})
         save_results()
     install()
     startup('clean-install')
+    preference = qa/'plugin-data/CADWiz/plugin/preferences.json'
+    preference.parent.mkdir(parents=True, exist_ok=True)
+    preference.write_text(json.dumps({'ai_app': 'codex_cli', 'ai_setup_route': 'codex_cli'}))
     startup('restart-2')
     startup('restart-3')
     # Test an actual prior committed release, not just a directory labelled old.

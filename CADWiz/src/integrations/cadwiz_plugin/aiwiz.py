@@ -118,7 +118,7 @@ class AIWizPage:
         self.cli_result = None
         self.cli_checked = 0.0
         if self.route in ('claude', 'chatgpt', 'codex_cli', 'free', 'other'):
-            self.choose(self.route)
+            self.choose(self.route, persist=False)
 
     def label(self, layout, text, heading=False):
         label = self.panel.QtWidgets.QLabel(text)
@@ -128,15 +128,16 @@ class AIWizPage:
         layout.addWidget(label)
         return label
 
-    def choose(self, route):
-        self.panel.prefs.ai_setup_route = route
-        self.panel.save_preferences()
+    def choose(self, route, persist=True):
+        self.route = route
+        if persist:
+            self.panel.prefs.ai_setup_route = route
+            self.panel.save_preferences()
         if route == 'free':
             self.page.setCurrentIndex(1)
             self.management.refresh()
             return
-        self.route = route
-        if route in ('claude', 'chatgpt', 'codex_cli'):
+        if persist and route in ('claude', 'chatgpt', 'codex_cli'):
             self.panel.prefs.ai_app = route
             self.panel.save_preferences()
         self.stack.setCurrentIndex(1)
