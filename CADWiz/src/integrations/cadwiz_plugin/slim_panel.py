@@ -143,7 +143,7 @@ def _button(QtWidgets: Any, key: str, parent: Any) -> Any:
 def assistant_word(ai_app: str) -> str:
     """The name on the Show button for the assistant chosen at the top of the panel
     (ORDER-2026-10-21-01: CADWiz works with Claude or Codex; neither is the default)."""
-    return {"claude": "Claude", "chatgpt": "Codex"}.get(str(ai_app), "assistant")
+    return {"claude": "Claude", "chatgpt": "Codex", "codex_cli": "Codex CLI"}.get(str(ai_app), "assistant")
 
 
 def run_freecad_command(command: str) -> None:

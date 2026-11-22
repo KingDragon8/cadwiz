@@ -15,7 +15,15 @@ def connect(panel) -> None:
             return
         app = "claude" if app.startswith("Claude") else "chatgpt"
     try:
+        if app == "codex_cli":
+            from .codex_cli import probe
+            check = probe()
+            if not check.get("authenticated"):
+                qt.QMessageBox.information(panel.content, "Codex CLI: " + check["state"], check["guidance"])
+                return
         info = setup.runtime()
+        if app == "codex_cli":
+            info = dict(info, client_app="codex_cli")
         if app == "claude":
             bundle = Path(info["addon"]) / "Resources/CADWiz.mcpb"
             if not bundle.is_file():

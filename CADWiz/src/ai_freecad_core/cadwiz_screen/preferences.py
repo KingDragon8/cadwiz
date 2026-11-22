@@ -45,13 +45,14 @@ class Printer:
 
 #: Which AI app he talks to (ORDER-2026-10-19-02): picked at the top of the Creating
 #: page; "auto" = whichever of them is connected.
-AI_APPS = {"auto": "Whichever app I have open", "claude": "Claude", "chatgpt": "OpenAI / Codex"}
+AI_APPS = {"auto": "Whichever app I have open", "claude": "Claude", "chatgpt": "Codex Desktop", "codex_cli": "Codex CLI"}
 
 
 @dataclass(slots=True)
 class FounderPreferences:
     # The AI app he talks to
     ai_app: str = "auto"
+    ai_setup_route: str = ""
     # My workshop
     printers: list[Printer] = field(default_factory=lambda: [Printer("My printer")])
     default_printer: str = "My printer"
@@ -73,6 +74,8 @@ class FounderPreferences:
     versions_shown: int = 20
 
     def __post_init__(self) -> None:
+        if self.ai_setup_route not in ("", "claude", "chatgpt", "codex_cli", "free", "other"):
+            raise ValueError("Choose a supported AI setup route")
         for name, allowed in (("explanations", EXPLANATIONS), ("questions", QUESTIONS), ("big_changes", BIG_CHANGES),
                               ("licences", LICENCE_CHOICES), ("print_quality", QUALITIES), ("ai_app", AI_APPS)):
             if getattr(self, name) not in allowed:

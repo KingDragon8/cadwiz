@@ -46,3 +46,45 @@ jobs:
         with:
           name: mac-native-install-acceptance
           path: mac-acceptance*/
+
+  mac-intel-freecad:
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download and verify official FreeCAD
+        shell: bash
+        run: |
+          base=https://github.com/FreeCAD/FreeCAD/releases/download/1.1.4
+          arch=$(uname -m)
+          file=FreeCAD_1.1.4-macOS-${arch}-py311.dmg
+          curl -fL "$base/$file" -o "$RUNNER_TEMP/$file"
+          curl -fL "$base/$file-SHA256.txt" -o "$RUNNER_TEMP/checksums.txt"
+          cd "$RUNNER_TEMP"
+          expected=$(awk '{print $1; exit}' checksums.txt)
+          actual=$(shasum -a 256 "$file" | awk '{print $1}')
+          test "$expected" = "$actual"
+          mkdir -p "$RUNNER_TEMP/freecad-dmg"
+          hdiutil attach "$file" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/freecad-dmg"
+          app=$(find "$RUNNER_TEMP/freecad-dmg" -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$app"
+          ditto "$app" "$RUNNER_TEMP/FreeCAD.app"
+          hdiutil detach "$RUNNER_TEMP/freecad-dmg"
+      - name: Clean install, upgrade, recovery and real GUI restarts
+        run: python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output mac-acceptance
+      - name: Repeat on case-sensitive APFS
+        shell: bash
+        run: |
+          hdiutil create -size 1g -fs 'Case-sensitive APFS' -volname CADWizCaseQA -type SPARSE -o "$RUNNER_TEMP/cadwiz-case.sparseimage"
+          mkdir -p "$RUNNER_TEMP/cadwiz-case-volume"
+          hdiutil attach "$RUNNER_TEMP/cadwiz-case.sparseimage" -nobrowse -mountpoint "$RUNNER_TEMP/cadwiz-case-volume"
+          python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --case-parent "$RUNNER_TEMP/cadwiz-case-volume" --output mac-acceptance-sensitive
+          python3 -c "import json; assert json.load(open('mac-acceptance-sensitive/acceptance.json'))['case_sensitive']"
+          hdiutil detach "$RUNNER_TEMP/cadwiz-case-volume"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-native-install-acceptance-intel
+          path: mac-acceptance*/

@@ -38,7 +38,8 @@ def test_native_shell_preserves_script_and_profile_paths(tmp_path, shell):
 @pytest.mark.skipif(os.name != 'nt' or not (BIN / 'python.exe').exists(), reason='Windows FreeCAD Python required')
 def test_original_inline_command_reproduces_nameerror(tmp_path):
     script = tmp_path / 'original.ps1'
-    script.write_text("& 'C:/Program Files/FreeCAD 1.1/bin/python.exe' -c 'from pathlib import Path; print(Path.cwd() / \"Mod\")'\nexit $LASTEXITCODE\n")
+    executable = str(BIN / 'python.exe').replace("'", "''")
+    script.write_text(f"& '{executable}' -c 'from pathlib import Path; print(Path.cwd() / \"Mod\")'\nexit $LASTEXITCODE\n")
     result = subprocess.run(['powershell.exe', '-NoProfile', '-File', str(script)], capture_output=True, text=True, timeout=60)
     assert result.returncode != 0 and "name 'Mod' is not defined" in result.stderr
 

@@ -5,7 +5,8 @@ import queue
 import threading
 from typing import Any
 
-from .free_ai_connection import ConnectionFailure, WindowsCredentialStore, check_groq_key, check_provider_key, validate_key
+from .free_ai_connection import ConnectionFailure, check_groq_key, check_provider_key, validate_key
+from .secure_store import credential_store
 from .free_ai_manager import CATALOG
 
 
@@ -44,7 +45,7 @@ def show_enrollment(panel: Any, on_verified=None, provider_id='groq') -> None:
     from urllib.parse import urlsplit
     text("The key is sent only to " + urlsplit(guide.models_url).hostname + " over HTTPS for a read-only connection check. "
          "No prompt, model, screenshot or dimensions are sent. No inference call is made. "
-         "On success the key is stored in your Windows Credential Manager, not your CAD files.")
+         "On success the key is stored in Windows Credential Manager, macOS Keychain, or Linux Secret Service, not your CAD files.")
     consent = qt.QCheckBox("Allow this connection check and secure key storage", dialog)
     consent.setObjectName("CADWiz_Free_AI_Consent")
     layout.addWidget(consent)
@@ -73,7 +74,7 @@ def show_enrollment(panel: Any, on_verified=None, provider_id='groq') -> None:
             return
         try:
             secret = validate_key(key.text())
-            store = WindowsCredentialStore() if provider_id=='groq' else WindowsCredentialStore('CADWiz/FreeAI/'+provider_id)
+            store = credential_store(provider_id)
         except ConnectionFailure as error:
             status.setText(str(error))
             return
@@ -126,7 +127,7 @@ def show_enrollment(panel: Any, on_verified=None, provider_id='groq') -> None:
         if state["busy"]:
             return
         try:
-            (WindowsCredentialStore() if provider_id=='groq' else WindowsCredentialStore('CADWiz/FreeAI/'+provider_id)).remove()
+            credential_store(provider_id).remove()
             key.clear()
             status.setText("Saved key removed from this computer. Revoke it at the provider separately if needed.")
             if on_verified is not None:

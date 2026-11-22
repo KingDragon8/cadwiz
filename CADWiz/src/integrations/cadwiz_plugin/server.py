@@ -62,6 +62,8 @@ def client_name(ancestors: list[str] | None = None) -> str:
     this. Anything not recognised as ChatGPT's is Claude Desktop, as before."""
     if ancestors is None:
         explicit = os.environ.get("CADWIZ_CLIENT_APP", "").strip().lower()
+        if explicit == "codex_cli":
+            return "Codex CLI"
         if explicit in ("chatgpt", "codex"):
             return "ChatGPT (Codex app)"
         if explicit == "claude":
@@ -162,7 +164,8 @@ def _post(route: str, payload: dict[str, Any], timeout: float = TIMEOUT_S) -> di
 
 
 def call(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
-    return _post("call", {"tool": tool, "arguments": {k: v for k, v in arguments.items() if v is not None}})
+    return _post("call", {"tool": tool, "client": client_name(),
+                           "arguments": {k: v for k, v in arguments.items() if v is not None}})
 
 
 def _heartbeat() -> None:
