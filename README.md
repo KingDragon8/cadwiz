@@ -57,7 +57,7 @@ available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**Beta 0.9.2.** Opens AI Wiz Setup in FreeCAD and separates setup from connection management. See [0.9.2 changes](docs/RELEASE-NOTES-0.9.2.md).
+**Beta 0.9.3.** Adds independent Codex CLI setup, persistent assistant selection, cross-platform OS credential storage and explicit connection/CAD readiness states. See [0.9.3 changes](docs/RELEASE-NOTES-0.9.3.md).
 and the Free AIWiz features from 0.8.8.
 
 - **Works:** seeing and measuring your model; building and editing parts as

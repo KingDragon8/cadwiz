@@ -16,7 +16,7 @@ import time
 import tomllib
 from pathlib import Path
 
-VERSION = "0.9.2"
+VERSION = "0.9.3"
 
 
 def data_dir() -> Path:
@@ -72,7 +72,7 @@ def runtime() -> dict:
 def server_values(info: dict) -> dict:
     return {"command": info["python"],
             "args": [str(Path(info["addon"]) / "src/integrations/cadwiz_plugin/offline_launcher.py")],
-            "env": {"CADWIZ_CLIENT_APP": "chatgpt"}, "startup_timeout_sec": 60, "tool_timeout_sec": 180}
+            "env": {"CADWIZ_CLIENT_APP": "codex_cli" if info.get("client_app") == "codex_cli" else "chatgpt"}, "startup_timeout_sec": 60, "tool_timeout_sec": 180}
 
 
 def _blocks(text: str) -> tuple[str, str]:
@@ -105,7 +105,8 @@ def entry(info: dict) -> str:
     values = server_values(info)
     return ("\n[mcp_servers.cadwiz]\ncommand = " + json.dumps(values["command"]) +
             "\nargs = " + json.dumps(values["args"]) +
-            '\nstartup_timeout_sec = 60\ntool_timeout_sec = 180\n\n[mcp_servers.cadwiz.env]\nCADWIZ_CLIENT_APP = "chatgpt"\n')
+            '\nstartup_timeout_sec = 60\ntool_timeout_sec = 180\n\n[mcp_servers.cadwiz.env]\nCADWIZ_CLIENT_APP = '
+            + json.dumps(values['env']['CADWIZ_CLIENT_APP']) + '\n')
 
 
 def connect(info: dict, path: Path | None = None) -> Path:
@@ -177,7 +178,10 @@ def check(info: dict) -> dict:
         path = config_path()
         parsed = tomllib.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
         existing = parsed.get("mcp_servers", {}).get("cadwiz")
-        if existing and existing != server_values(info):
+        expected_info = dict(info)
+        if existing and existing.get('env', {}).get('CADWIZ_CLIENT_APP') == 'codex_cli' and 'client_app' not in info:
+            expected_info['client_app'] = 'codex_cli'
+        if existing and existing != server_values(expected_info):
             status.update(code="CW-SETUP-PATH", message="The saved OpenAI connection needs an update. Press Connect Codex; a backup and undo are included.")
     except (OSError, ValueError, KeyError) as error:
         status.update(code="CW-SETUP-CHECK", message=str(error))
@@ -199,6 +203,9 @@ def repair_owned(info: dict, pause=time.sleep) -> dict:
         target = Path(receipt["path"])
         text = target.read_text(encoding="utf-8-sig") if target.exists() else ""
         current = tomllib.loads(text).get("mcp_servers", {}).get("cadwiz")
+        previous = current or receipt.get('installed', {})
+        if 'client_app' not in info and previous.get('env', {}).get('CADWIZ_CLIENT_APP') == 'codex_cli':
+            info = dict(info, client_app='codex_cli')
         desired = server_values(info)
         if current == desired:
             return check(info)

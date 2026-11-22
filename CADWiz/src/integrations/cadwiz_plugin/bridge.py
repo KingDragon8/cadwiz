@@ -43,6 +43,8 @@ def app_of(client: str) -> str:
     """Which AI app a hello came from: "chatgpt" for ChatGPT and its Codex app,
     else "claude" -- every client before ORDER-2026-10-19-02 was Claude Desktop."""
     name = client.lower()
+    if "codex cli" in name:
+        return "codex_cli"
     return "chatgpt" if any(word in name for word in ("chatgpt", "codex")) else "claude"
 
 
@@ -59,6 +61,7 @@ class Bridge:
         #: Each AI app's own last hello (ORDER-2026-10-19-02): Claude and ChatGPT
         #: can both be connected, each through its own copy of the MCP server.
         self.hellos: dict[str, float] = {}
+        self.cad_success: dict[str, float] = {}
         self.busy = False
         bridge = self
 
@@ -82,7 +85,11 @@ class Bridge:
                     bridge.hellos[app_of(bridge.client)] = bridge.last_hello
                     reply = {"ok": True, "freecad_pid": os.getpid()}
                 else:
-                    reply = bridge.submit(str(body.get("tool", "")), dict(body.get("arguments") or {}))
+                    tool = str(body.get("tool", ""))
+                    reply = bridge.submit(tool, dict(body.get("arguments") or {}))
+                    if reply.get("ok") and ((tool == "inspect_document" and reply.get("objects") and reply.get("document"))
+                            or (tool in ("build_model", "edit_object") and (reply.get("health") or {}).get("level") == "E3")):
+                        bridge.cad_success[app_of(str(body.get("client", "")))] = time.time()
                 data = json.dumps(reply, default=str).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -131,6 +138,9 @@ class Bridge:
         if app == app_of(self.client):
             latest = max(latest, self.last_hello)
         return time.time() - latest < CONNECTED_WITHIN_S
+
+    def cad_ready_to(self, app: str) -> bool:
+        return self.connected_to(app) and time.time() - self.cad_success.get(app, 0.0) < CONNECTED_WITHIN_S
 
     # ---- requests ----------------------------------------------------------------------
     def submit(self, tool: str, arguments: dict) -> dict:

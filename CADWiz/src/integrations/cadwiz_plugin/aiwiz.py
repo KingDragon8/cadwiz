@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+import time
 from pathlib import Path
 from .install_setup import atomic_write
 
@@ -12,7 +14,7 @@ def desktop_route(app, platform=None):
     platform = platform or sys.platform
     if app == 'claude':
         return ('Claude Desktop', 'https://claude.ai/download', platform != 'linux')
-    if platform == 'linux':
+    if app == 'codex_cli' or platform == 'linux':
         return ('Codex CLI', 'https://developers.openai.com/codex/cli/', True)
     return ('Codex', 'https://developers.openai.com/codex/app/', True)
 
@@ -20,7 +22,7 @@ def desktop_route(app, platform=None):
 def connected_apps(bridge):
     if bridge is None or not hasattr(bridge, 'connected_to'):
         return []
-    return [name for key, name in (('claude', 'Claude Desktop'), ('chatgpt', 'OpenAI / Codex'))
+    return [name for key, name in (('claude', 'Claude Desktop'), ('chatgpt', 'OpenAI / Codex'), ('codex_cli', 'Codex CLI'))
             if bridge.connected_to(key)]
 
 
@@ -71,6 +73,7 @@ class AIWizPage:
         for key, title, description, button in (
             ('claude', 'Claude', 'Use Claude Desktop with your account.', 'Set up Claude'),
             ('chatgpt', 'OpenAI', 'Use Codex with your OpenAI account.', 'Set up Codex'),
+            ('codex_cli', 'Codex CLI', 'Use the installed command-line agent. No ChatGPT Desktop required.', 'Set up Codex CLI'),
             ('free', 'Free AIWiz', 'Explore providers and check API access. Direct CAD requests are not enabled yet.', 'Explore free AI'),
             ('other', 'Other AI', 'Gemini, Grok or another AI: check current support before connecting.', 'Choose my AI'),
         ):
@@ -111,7 +114,11 @@ class AIWizPage:
         self.management = FreeAIPage(panel)
         self.page.addTab(self.management.page, 'AI Wiz Management')
         self.page.setCurrentIndex(landing_tab(self.record, panel.bridge()))
-        self.route = 'claude'
+        self.route = getattr(panel.prefs, 'ai_setup_route', '') or getattr(panel.prefs, 'ai_app', 'claude')
+        self.cli_result = None
+        self.cli_checked = 0.0
+        if self.route in ('claude', 'chatgpt', 'codex_cli', 'free', 'other'):
+            self.choose(self.route)
 
     def label(self, layout, text, heading=False):
         label = self.panel.QtWidgets.QLabel(text)
@@ -122,18 +129,25 @@ class AIWizPage:
         return label
 
     def choose(self, route):
+        self.panel.prefs.ai_setup_route = route
+        self.panel.save_preferences()
         if route == 'free':
             self.page.setCurrentIndex(1)
             self.management.refresh()
             return
         self.route = route
+        if route in ('claude', 'chatgpt', 'codex_cli'):
+            self.panel.prefs.ai_app = route
+            self.panel.save_preferences()
         self.stack.setCurrentIndex(1)
-        desktop = route in ('claude', 'chatgpt')
+        desktop = route in ('claude', 'chatgpt', 'codex_cli')
         self.download.setVisible(desktop)
         self.connect.setVisible(desktop)
         self.other.setVisible(not desktop)
         self.support.setVisible(not desktop)
         if desktop:
+            if route == 'codex_cli':
+                self.check_cli()
             name, _url, supported = desktop_route(route)
             if not supported:
                 self.detail_title.setText('Claude Desktop is not a Linux route')
@@ -151,6 +165,13 @@ class AIWizPage:
                                      'No AI account is assigned by CADWiz.' +
                                      (' ChatGPT and Codex are different apps; this route configures Codex.'
                                       if route == 'chatgpt' else ''))
+            if route == 'codex_cli':
+                self.detail_text.setText('1. Install Codex CLI using the official instructions below.\n'
+                    '2. In your terminal, run codex login and approve sign-in yourself.\n'
+                    '3. Press Connect to add the existing CADWiz MCP adapter, with backup and Undo.\n'
+                    '4. Start or restart Codex CLI, then ask: What is open in FreeCAD?\n\n'
+                    'No desktop app is required. Authentication does not prove CAD readiness. '
+                    'CADWiz does not run paid inference during discovery or setup.')
             self.download.setText('Get ' + name)
             self.connect.setText('Connect ' + name)
         else:
@@ -178,11 +199,26 @@ class AIWizPage:
         connect(self.panel)
         self.refresh()
 
+    def check_cli(self):
+        if time.monotonic() - self.cli_checked < 30:
+            return
+        self.cli_checked = time.monotonic()
+        def work():
+            from .codex_cli import probe
+            self.cli_result = probe()
+        threading.Thread(target=work, name='CADWizCodexDiscovery', daemon=True).start()
+
     def refresh(self):
         apps = connected_apps(self.panel.bridge())
         self.status.setText(('Connection verified: ' + ', '.join(apps) +
                              '. Ask your assistant to inspect the open model.') if apps else
                             'Choose your AI. No desktop assistant is connected right now.')
+        if getattr(self, 'route', '') == 'codex_cli':
+            from .codex_cli import connection_status
+            self.check_cli()
+            result = connection_status(self.cli_result, self.panel.bridge()) if self.cli_result else None
+            self.status.setText(('Codex CLI: ' + result['state'] + '. ' + result['guidance'])
+                                if result else 'Checking installed Codex CLI and authentication…')
         if apps and not self.recorded:
             try:
                 atomic_write(self.record, json.dumps({'schema': 1, 'connection_seen': True}))

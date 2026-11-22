@@ -302,9 +302,10 @@ class FreeAIPage:
     def refresh(self) -> None:
         bridge = self.panel.bridge()
         lines = []
-        for app, name in (("claude", "Claude"), ("chatgpt", "OpenAI / Codex")):
+        for app, name in (("claude", "Claude"), ("chatgpt", "Codex Desktop"), ("codex_cli", "Codex CLI")):
             connected = bool(bridge is not None and hasattr(bridge, "connected_to") and bridge.connected_to(app))
-            lines.append(f"{name}: " + ("Ready — app assisted" if connected else "Not connected"))
+            ready = connected and hasattr(bridge, "cad_ready_to") and bridge.cad_ready_to(app)
+            lines.append(f"{name}: " + ("CAD Ready" if ready else "Connected — CAD check pending" if connected else "Not connected"))
         self.apps.setText("\n".join(lines) + "\nUsage and eligibility depend on your account. "
                           "No automatic switching between consumer accounts is performed.")
         try:
