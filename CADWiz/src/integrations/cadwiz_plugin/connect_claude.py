@@ -22,6 +22,9 @@ background thread; the panel only reads `stage` once a second.
 from __future__ import annotations
 
 import subprocess
+import sys
+import shutil
+from pathlib import Path
 import threading
 import time
 from typing import Any, Callable
@@ -52,11 +55,12 @@ def say(stage: str, app: str = "claude") -> str:
         "opening": f"Opening {name}… it connects by itself in about half a minute.",
         "waiting": f"{name[0].upper() + name[1:]} is open; waiting for it to check in (up to a minute).",
         "connected": "Connected.",
-        "no_app": f"I couldn't find {name} on this PC. Install it from {download}, then press Connect again.",
-        "open_failed": f"Windows wouldn't open {name}. Open it from the Start menu, then press Connect again.",
+        "no_app": f"I couldn't find {name} on this computer. Install it from {download}, then press Connect again.",
+        "open_failed": f"I couldn't open {name}. Open the app yourself, then press Connect again.",
+        "discovery_failed": "App discovery was denied or unavailable. Keep FreeCAD open and check the connector; no app was launched.",
         "app_silent": (f"{name[0].upper() + name[1:]} is open but its CADWiz connection isn't answering. Check that the CADWiz "
                        f"connector is switched on ({APPS[app]['where']}; run CADWiz's installer again if it isn't listed). If it "
-                       f"is, quit the app fully -- right-click its icon by the clock and choose Quit -- and open it again."),
+                       f"is, quit the app fully using its Quit command, then open it again."),
     }[stage]
 
 
@@ -66,6 +70,8 @@ SAY = {stage: say(stage) for stage in ("checking", "opening", "waiting", "connec
 
 def ask_windows(app: str = "claude", timeout: float = 8.0) -> dict[str, Any]:
     """Is the app running, and how to open it (its Start-menu id)."""
+    if sys.platform != "win32":
+        return _posix_app(app, timeout)
     spec = APPS[app]
     if app == "chatgpt":
         # Historical wire key stays compatible. Match Codex identity, not an unrelated
@@ -84,7 +90,29 @@ def ask_windows(app: str = "claude", timeout: float = 8.0) -> dict[str, Any]:
 
 
 def open_app(appid: str) -> None:
-    subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{appid}"], creationflags=NO_WINDOW)  # noqa: S603,S607 - the user's own app
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", "-a", appid])
+    elif sys.platform == "win32":
+        subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{appid}"], creationflags=NO_WINDOW)
+    else:
+        subprocess.Popen([appid])
+
+
+def _posix_app(app: str, timeout: float) -> dict[str, Any]:
+    name = "Claude" if app == "claude" else "Codex"
+    done = subprocess.run(["ps", "-A", "-o", "comm="], capture_output=True, text=True, timeout=timeout)
+    if done.returncode:
+        raise OSError("Process discovery unavailable")
+    # Match the desktop executable; a CLI process does not prove a desktop app exists.
+    if sys.platform == "darwin":
+        paths = [Path('/Applications') / (name + '.app'), Path.home() / 'Applications' / (name + '.app')]
+        appid = next((str(p) for p in paths if p.is_dir()), '')
+        running = any(line.strip().endswith(f'/{name}.app/Contents/MacOS/{name}') for line in done.stdout.splitlines())
+    else:
+        executable = name.lower() + '-desktop'
+        appid = shutil.which(executable) or ''
+        running = any(Path(line.strip()).name == executable for line in done.stdout.splitlines())
+    return {'running': running, 'appid': appid}
 
 
 class Connector:
@@ -108,7 +136,7 @@ class Connector:
             except TypeError:          # a stand-in that takes no app
                 return self.ask()
         except Exception:  # noqa: BLE001 - not knowing is treated as not running
-            return {"running": False, "appid": ""}
+            return {"running": False, "appid": "", "discovery_failed": True}
 
     def _work(self) -> None:
         candidates = list(APPS) if self.choice == "auto" else [self.app]
@@ -119,6 +147,9 @@ class Connector:
                 self.app, self.stage = app, "waiting"
                 return
         found = {app: self._look(app) for app in candidates}
+        if any(info.get("discovery_failed") for info in found.values()):
+            self.stage = "discovery_failed"
+            return
         running = [app for app in candidates if found[app].get("running")]
         if running:
             self.app, self.stage = running[0], "waiting"

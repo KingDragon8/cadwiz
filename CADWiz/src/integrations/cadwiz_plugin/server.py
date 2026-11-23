@@ -51,6 +51,16 @@ INSTRUCTIONS = """CADWiz gives you hands and eyes in the user's FreeCAD on this 
 
 TIMEOUT_S = 900.0
 
+INSTRUCTIONS += """
+- Recognize status intent without slash syntax. For 'Am I connected?', 'What is my AI status?',
+  'Is my account working?', or login/status questions, call diagnostic_status with the user's question.
+  Use connection_status for FreeCAD instance discovery. Report authentication, MCP heartbeat,
+  document access and CAD-operation success as separate facts. Never infer account plan, payment,
+  quota or authentication from a green heartbeat. If native account information is unavailable,
+  explain that and direct the user to their assistant's built-in status/account view; do not claim
+  to have executed its slash command. No generated macro is needed for diagnostics.
+"""
+
 
 _chosen: dict[str, Any] = {}
 _client: list[str] = []
@@ -88,7 +98,11 @@ def _bridges() -> list[dict[str, Any]]:
     found = []
     for path in (plugin_data_dir() / "bridges").glob("*.json"):
         try:
-            found.append(json.loads(path.read_text(encoding="utf-8")))
+            info = json.loads(path.read_text(encoding="utf-8"))
+            if (isinstance(info, dict) and type(info.get("pid")) is int and info["pid"] > 0
+                    and type(info.get("port")) is int and 0 < info["port"] < 65536
+                    and isinstance(info.get("token"), str) and info["token"]):
+                found.append(info)
         except (OSError, ValueError):
             continue
     return sorted(found, key=lambda b: str(b.get("started_utc", "")), reverse=True)
@@ -96,7 +110,19 @@ def _bridges() -> list[dict[str, Any]]:
 
 def _alive(info: dict[str, Any]) -> bool:
     try:
-        _send(info, "hello", {"client": client_name()}, timeout=3)
+        reply = _send(info, "hello", {"client": client_name()}, timeout=3)
+        if not isinstance(reply, dict) or reply.get("ok") is not True or reply.get("freecad_pid") != info.get("pid"):
+            return False
+        for key in ("instance_id", "started_utc"):
+            if key == 'started_utc' and not info.get('instance_id') and key not in reply:
+                continue  # Legacy authenticated bridge: no document recovery metadata.
+            if info.get(key) and reply.get(key) != info[key]:
+                return False
+        documents = reply.get("documents", [])
+        if not isinstance(documents, list) or any(not isinstance(d, dict) or
+                not isinstance(d.get("file", ""), str) or not isinstance(d.get("name", ""), str) for d in documents):
+            return False
+        info["documents"] = documents
         return True
     except (urllib.error.URLError, ConnectionError, TimeoutError, OSError, ValueError):
         return False
@@ -106,9 +132,17 @@ def _selected_window() -> dict[str, Any]:
     from integrations.cadwiz_plugin.session import plugin_data_dir
     try:
         value = json.loads((plugin_data_dir() / "selected-window.json").read_text(encoding="utf-8"))
-        return value if isinstance(value, dict) else {}
-    except (OSError, ValueError):
+        if (not isinstance(value, dict) or type(value.get('pid')) is not int or value['pid'] <= 0
+                or not isinstance(value.get('started_utc'), str) or not value['started_utc']):
+            return {'selection_invalid': True}
+        document = value.get('document')
+        if document is not None and (not isinstance(document, dict) or not isinstance(document.get('file'), str)):
+            return {'selection_invalid': True}
+        return value
+    except FileNotFoundError:
         return {}
+    except (OSError, ValueError):
+        return {'selection_invalid': True}
 
 
 def _bridge() -> dict[str, Any] | None:
@@ -121,7 +155,8 @@ def _bridge() -> dict[str, Any] | None:
     selected = _selected_window() if not requested else {}
     if selected:
         for info in _bridges():
-            if all(info.get(key) == selected.get(key) for key in ("pid", "started_utc")) and _alive(info):
+            keys = ("pid", "started_utc", "instance_id") if selected.get("instance_id") else ("pid", "started_utc")
+            if all(info.get(key) == selected.get(key) for key in keys) and _alive(info):
                 _chosen.clear()
                 _chosen.update(info)
                 return _chosen
@@ -156,6 +191,22 @@ NOT_RUNNING = ("CADWiz cannot reach the selected FreeCAD window. Keep your work 
 def _post(route: str, payload: dict[str, Any], timeout: float = TIMEOUT_S) -> dict[str, Any]:
     info = _bridge()
     if not info:
+        tool = payload.get("tool") if route == "call" else None
+        if tool:
+            status, candidate = _recovery_status()
+            # A replacement is read-only until Connect explicitly selects that window.
+            # Never replay or redirect a timed-out model operation.
+            if candidate and tool in ("inspect_document", "get_selection", "measure", "problems"):
+                arguments = payload.get("arguments") or {}
+                active = next((d for d in candidate.get("documents", []) if d.get("active")), {})
+                if not arguments.get("document") or arguments["document"] == active.get("name"):
+                    try:
+                        result = _send(candidate, route, payload, timeout)
+                        result["connection_recovery"] = "Read-only recovery; select this window with Connect before editing."
+                        return result
+                    except (urllib.error.URLError, ConnectionError, TimeoutError, OSError, ValueError):
+                        pass
+            return {"ok": False, "say_to_founder": status["guidance"], "connection": status}
         return {"ok": False, "say_to_founder": NOT_RUNNING}
     try:
         return _send(info, route, payload, timeout)
@@ -168,6 +219,32 @@ def call(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
                            "arguments": {k: v for k, v in arguments.items() if v is not None}})
 
 
+def _recovery_status() -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """Authenticated discovery only. Never overwrites selection or changes documents."""
+    selected = _selected_window() or _chosen
+    live = [info for info in _bridges() if _alive(info)]
+    expected = (selected.get("document") or {}).get("file")
+    if not expected:
+        expected = next((d.get("file") for d in _chosen.get("documents", []) if d.get("active")), None)
+    def same_file(value):
+        # No case folding on POSIX: macOS may use a case-sensitive filesystem.
+        return bool(value and expected and os.path.normcase(os.path.abspath(value)) == os.path.normcase(os.path.abspath(expected)))
+    matching = [i for i in live if any(d.get("active") and same_file(d.get("file"))
+                for d in i.get("documents", []) if isinstance(d, dict))]
+    candidate = matching[0] if len(matching) == 1 and not os.environ.get("CADWIZ_FREECAD_PID", "").strip() else None
+    reason = "matching_document_read_only" if candidate else ("selection_required" if live else "no_reachable_bridge")
+    guidance = ("Found the same saved document in a replacement FreeCAD window. Read-only inspection is available; "
+                "press Connect in that window before editing." if candidate else
+                "The selected FreeCAD bridge is unreachable. Other windows are listed; press Connect in the intended "
+                "window to confirm it before continuing." if live else
+                "No authenticated FreeCAD bridge answers. Keep your work open; check CADWiz startup and local connection "
+                "permissions, then press Connect. This does not prove FreeCAD is closed.")
+    return {"state": reason, "guidance": guidance,
+            "selected_pid": selected.get("pid"),
+            "instances": [{"pid": i["pid"], "started_utc": i.get("started_utc"),
+                           "documents": i.get("documents", [])} for i in live]}, candidate
+
+
 def _heartbeat() -> None:
     while True:
         _post("hello", {"client": client_name()}, timeout=5)
@@ -175,7 +252,18 @@ def _heartbeat() -> None:
 
 
 #: Tools that run in this server process rather than in FreeCAD (ORDER-2026-10-21-01).
-SERVER_TOOLS = ("cadwiz_known_issues", "cadwiz_send_feedback")
+SERVER_TOOLS = ("cadwiz_known_issues", "cadwiz_send_feedback", "connection_status", "diagnostic_status")
+
+
+def connection_report() -> dict[str, Any]:
+    info = _bridge()
+    if info:
+        return {"state": "connected", "selected_pid": info["pid"],
+                "documents": info.get("documents", []),
+                "document_access": "not_tested_by_heartbeat",
+                "cad_operation": "not_tested_by_heartbeat",
+                "guidance": "The authenticated bridge answers. Inspect the intended document before editing."}
+    return _recovery_status()[0]
 
 
 def help_desk() -> Any:
@@ -189,6 +277,17 @@ def build_server() -> Any:
     from mcp.server.fastmcp import FastMCP, Image
 
     server = FastMCP("CADWiz", instructions=INSTRUCTIONS)
+
+    @server.tool(structured_output=False)
+    def connection_status() -> str:
+        """Read-only authenticated discovery. Never switches the edit target or exposes tokens."""
+        return json.dumps(connection_report())
+
+    @server.tool(structured_output=False)
+    def diagnostic_status(question: str = "Am I connected?") -> str:
+        """Native status for ordinary-language connection, login and account questions. No inference or login."""
+        from integrations.cadwiz_plugin.diagnostics import status_report
+        return json.dumps(status_report(question, connection_report))
 
     def reply(result: dict[str, Any]) -> list[Any]:
         images = [p for p in (result.pop("images", None) or []) if Path(str(p)).is_file()]

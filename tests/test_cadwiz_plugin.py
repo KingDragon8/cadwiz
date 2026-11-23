@@ -252,7 +252,9 @@ def test_the_bridge_needs_the_token_and_listens_only_locally(tmp_path) -> None:
 def test_the_server_says_plainly_when_freecad_is_not_open(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     result = plugin_server.call("inspect_document", {})
-    assert result == {"ok": False, "say_to_founder": plugin_server.NOT_RUNNING}
+    assert result['ok'] is False
+    assert result['connection']['state'] == 'no_reachable_bridge'
+    assert 'does not prove FreeCAD is closed' in result['say_to_founder']
 
 
 def test_a_reply_with_pictures_reaches_claude_as_text_and_images(monkeypatch, tmp_path) -> None:

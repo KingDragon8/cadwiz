@@ -30,12 +30,25 @@ from integrations.cadwiz_plugin.connect_claude import APPS, NO_WINDOW, ask_windo
 
 def freecad_exe() -> Path:
     """freecad.exe beside the Python running this (the shortcut uses FreeCAD's own)."""
-    return Path(sys.executable).resolve().with_name("freecad.exe")
+    python = Path(sys.executable).resolve()
+    if sys.platform == 'darwin':
+        for parent in python.parents:
+            if parent.suffix == '.app':
+                return parent / 'Contents/MacOS/FreeCAD'
+        raise FileNotFoundError('Run the shortcut using the installed FreeCAD app Python.')
+    return python.with_name('freecad.exe' if sys.platform == 'win32' else 'freecad')
 
 
 def freecad_running() -> bool:
+    if sys.platform != 'win32':
+        done = subprocess.run(['ps', '-A', '-o', 'comm='], capture_output=True, text=True, timeout=10)
+        if done.returncode:
+            raise OSError('Cannot inspect running FreeCAD instances; refusing to launch a duplicate.')
+        return any(Path(line.strip()).name.lower() in ('freecad', 'freecad.exe') for line in done.stdout.splitlines())
     done = subprocess.run(["tasklist", "/FI", "IMAGENAME eq freecad.exe", "/NH"], capture_output=True, text=True,
                           timeout=10, creationflags=NO_WINDOW)
+    if done.returncode:
+        raise OSError('Cannot inspect running FreeCAD instances; refusing to launch a duplicate.')
     return "freecad.exe" in done.stdout.lower()
 
 

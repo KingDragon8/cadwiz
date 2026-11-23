@@ -104,7 +104,7 @@ QtCore.QTimer.singleShot(12000, finish)
         run(command)
         record = json.loads(result_file.read_text())
         assert record['workbench_registered'] and record['panel_visible'], record
-        assert record['cadwiz_version'] == '0.9.4', record
+        assert record['cadwiz_version'] == '0.9.5', record
         assert record['communication_title'] == 'Wiz communication screen' and record['guidance_present'], record
         assert record['aiwiz_tabs'] == ['AI Wiz Setup', 'AI Wiz Management'], record
         assert Path(record['loaded_source']).samefile(mod/'CADWiz'), record

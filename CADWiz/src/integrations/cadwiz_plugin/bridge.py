@@ -63,6 +63,7 @@ class Bridge:
         self.hellos: dict[str, float] = {}
         self.cad_success: dict[str, float] = {}
         self.busy = False
+        self.documents: list[dict[str, Any]] = []
         bridge = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -83,7 +84,10 @@ class Bridge:
                     bridge.last_hello = time.time()
                     bridge.client = str(body.get("client", ""))
                     bridge.hellos[app_of(bridge.client)] = bridge.last_hello
-                    reply = {"ok": True, "freecad_pid": os.getpid()}
+                    reply = {"ok": True, "freecad_pid": os.getpid(),
+                             "started_utc": bridge.identity["started_utc"],
+                             "instance_id": bridge.identity["instance_id"],
+                             "documents": bridge.documents}
                 else:
                     tool = str(body.get("tool", ""))
                     reply = bridge.submit(tool, dict(body.get("arguments") or {}))
@@ -106,22 +110,32 @@ class Bridge:
         self._thread.start()
         self.info_path.parent.mkdir(parents=True, exist_ok=True)
         self.identity = {"port": self.port, "token": self.token, "pid": os.getpid(),
+                         "instance_id": secrets.token_hex(16),
                          "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-        self.info_path.write_text(json.dumps(self.identity), encoding="utf-8")
+        from integrations.cadwiz_plugin.install_setup import atomic_write
+        atomic_write(self.info_path, json.dumps(self.identity))
+        if os.name != 'nt':
+            self.info_path.chmod(0o600)
         return self
 
     def select_current(self) -> None:
         """Explicit Connect / Show action chooses this window, never a new GUI."""
         from integrations.cadwiz_plugin.install_setup import atomic_write
 
-        identity = {key: self.identity[key] for key in ("pid", "started_utc")}
+        provider = getattr(self, 'document_provider', None)
+        if provider:
+            self.documents = provider()
+        identity = {key: self.identity[key] for key in ("pid", "started_utc", "instance_id")}
+        active = next((d for d in self.documents if d.get("active")), None)
+        if active:
+            identity["document"] = active
         atomic_write(self.info_path.parent.parent / "selected-window.json", json.dumps(identity))
 
     def stop(self) -> None:
         self._server.shutdown()
         try:
             data = json.loads(self.info_path.read_text(encoding="utf-8"))
-            if data.get("pid") == os.getpid():
+            if data.get("instance_id") == self.identity["instance_id"]:
                 self.info_path.unlink()          # our own connection file, written above; never a founder file
         except (OSError, ValueError):
             pass
@@ -158,6 +172,13 @@ class Bridge:
         one at a time (never re-entered while one runs)."""
         if self.busy:
             return
+        provider = getattr(self, "document_provider", None)
+        if provider:
+            # Only the GUI thread reads FreeCAD objects. HTTP sees an immutable snapshot.
+            try:
+                self.documents = provider()
+            except Exception:
+                self.documents = []
         self.busy = True
         try:
             while True:
@@ -189,6 +210,12 @@ def start_in_freecad() -> Bridge | None:
 
     session = PluginSession(app=FreeCAD, gui=FreeCADGui, pump=pump)
     bridge = Bridge(session.call, run_on_gui=lambda fn: fn())
+    def documents():
+        active = FreeCAD.ActiveDocument
+        return [{"name": d.Name, "file": str(d.FileName or ""),
+                 "active": d is active} for d in FreeCAD.listDocuments().values()]
+    bridge.document_provider = documents
+    bridge.documents = documents()
     bridge.session = session  # type: ignore[attr-defined]
     timer = QtCore.QTimer()
     timer.setInterval(100)

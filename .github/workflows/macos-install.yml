@@ -36,6 +36,8 @@ jobs:
           hdiutil detach "$RUNNER_TEMP/freecad-dmg"
       - name: Clean install, upgrade, recovery and real GUI restarts
         run: python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output mac-acceptance
+      - name: Native bridge restart and safe parametric recovery
+        run: '"$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" scripts/ci/native_bridge_recovery_check.py'
       - name: Repeat on case-sensitive APFS
         shell: bash
         run: |
@@ -78,6 +80,8 @@ jobs:
           hdiutil detach "$RUNNER_TEMP/freecad-dmg"
       - name: Clean install, upgrade, recovery and real GUI restarts
         run: python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output mac-acceptance
+      - name: Native bridge restart and safe parametric recovery
+        run: '"$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" scripts/ci/native_bridge_recovery_check.py'
       - name: Repeat on case-sensitive APFS
         shell: bash
         run: |
