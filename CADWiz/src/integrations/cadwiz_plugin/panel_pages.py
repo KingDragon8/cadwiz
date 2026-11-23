@@ -1144,7 +1144,7 @@ class SetupPage:
     def repair_installation(self) -> None:
         self.run_doctor()
         self.report_result.setText(self.report_result.text() + '\n\nRepair CADWiz: Save your work and quit FreeCAD completely. '
-            'Extract the complete 0.9.3 release ZIP. On Mac, run Install-CADWiz.command (or bash scripts/install_macos.sh). '
+            'Extract the complete 0.9.4 release ZIP. On Mac, run Install-CADWiz.command (or bash scripts/install_macos.sh). '
             'On Linux run bash scripts/install.sh with the selected FreeCAD Python. On Windows rerun Setup.exe. '
             'The Mac/Linux repair stages and verifies files, preserves old installations outside Mod, and prints a rollback manifest. '
             'It does not configure AI accounts. Restart FreeCAD, select CADWiz, verify its panel, then use AI Wiz Setup. '

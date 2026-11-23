@@ -80,6 +80,12 @@ def find_problems(document: Any, connected: bool = True) -> list[Problem]:
     problems.extend(_rebuild_problems(objects))
     problems.extend(_open_sketches(objects))
     problems.extend(_mesh_problems(objects))
+    from .gear_quality import lofted_gears
+
+    for feature in lofted_gears(objects):
+        problems.append(Problem("gear_profile",
+            f"{feature.Label}: lofted gear teeth need a tooth-shape check before printing.",
+            [feature.Name], detail_for_claude="LL-051: use native helical sweeps or verify generated intermediate sections against the rotated involute; solid validity and source-profile clearance alone are insufficient."))
     problems.extend(BACKGROUND.problems(objects) if _in_freecad_window() else _loose_and_overlapping(objects))
     return problems
 

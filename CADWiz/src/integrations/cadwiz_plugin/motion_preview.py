@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # Copyright (C) 2026 Steve Gregerson / WizLabs
-"""View-only motion for the measured toothpaste mechanism; no document writes.
+"""View-only motion for the current model; no document writes.
 
 The 100 mm preview stroke is deliberately inside the guide's available travel.
 The 6.5 mm drum radius couples crank angle to roller travel. Cable deformation,
@@ -50,11 +50,15 @@ class MotionPreview:
         if document is not None and all(document.getObject(name) is not None
                                         for name in ("PhoneArm", "Arm1", "Arm2", "Head", "Arm1_HoleA", "Arm2_HoleA", "Head_JointHole")):
             return PhoneArmPreview(document)
-        return super().__new__(cls)
+        if document is not None and all(document.getObject(name) is not None for name in PARTS):
+            return super().__new__(cls)
+        from integrations.cadwiz_plugin.general_motion import gear_pair, GearTrainPreview, ModelTurntablePreview
+        pair = gear_pair(document)
+        return GearTrainPreview(document, pair) if pair else ModelTurntablePreview(document)
 
     def __init__(self, document):
         if document is None or any(document.getObject(name) is None for name in PARTS):
-            raise ValueError("Motion preview needs a complete toothpaste crank assembly or articulated phone holder.")
+            raise ValueError("Open a supported mechanism or a 3D model before starting Animate.")
         from pivy import coin
         import FreeCAD as App
         import FreeCADGui as Gui
