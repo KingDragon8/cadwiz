@@ -42,3 +42,5 @@ from the original and corrected gearbox is retained under
 Installed changes take effect when FreeCAD next loads CADWiz. Do not restart or
 close an owner's unsaved session to load a validation improvement. This local
 patch is not evidence of publication in the website download.
+
+Closed-wire seam endpoints are normalized only within 1e-8 mm to remove floating-point duplication. Other self-intersections remain failures; polygons are never repaired with buffer(0).

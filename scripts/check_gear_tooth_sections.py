@@ -17,6 +17,17 @@ def check_sections(data: dict, tolerance_mm: float = 0.02) -> dict:
     from shapely.affinity import rotate
     from shapely.geometry import Polygon
 
+    def closed_polygon(points):
+        # OCC's closed-wire sampling may repeat the seam with sub-nanometre
+        # roundoff. Snap that endpoint only; never heal crossing flanks/buffer(0).
+        points = [list(p) for p in points]
+        if len(points) < 4 or any(len(p) != 2 or not all(math.isfinite(v) for v in p) for p in points):
+            raise ValueError("Invalid closed-profile coordinates")
+        if math.dist(points[0], points[-1]) > 1e-8:
+            raise ValueError("Profile sample is not explicitly closed")
+        points[-1] = points[0]
+        return Polygon(points)
+
     if not math.isfinite(tolerance_mm) or tolerance_mm <= 0 or not data:
         raise ValueError("Provide gear samples and a positive finite tolerance.")
     results = {}
@@ -28,7 +39,7 @@ def check_sections(data: dict, tolerance_mm: float = 0.02) -> dict:
         twist = float(gear["twist_deg"])
         if not math.isfinite(height) or height <= 0 or not math.isfinite(twist):
             raise ValueError(f"{name}: invalid helix dimensions")
-        reference = Polygon(gear["reference"])
+        reference = closed_polygon(gear["reference"])
         if not reference.is_valid or reference.area <= 0:
             raise ValueError(f"{name}: invalid reference profile")
         sections = gear["sections"]
@@ -42,7 +53,7 @@ def check_sections(data: dict, tolerance_mm: float = 0.02) -> dict:
             z = float(section["z"])
             if not math.isfinite(z) or not 0 < z < height or len(section["points"]) != 1:
                 raise ValueError(f"{name}: invalid generated cross-section")
-            actual = Polygon(section["points"][0])
+            actual = closed_polygon(section["points"][0])
             if not actual.is_valid or actual.area <= 0:
                 raise ValueError(f"{name}: invalid generated polygon")
             angle = twist * min(z, height - z) / (height / 2)

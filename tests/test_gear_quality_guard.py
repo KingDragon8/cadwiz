@@ -84,3 +84,14 @@ def test_missing_sample_file_returns_an_explicit_failure(monkeypatch, tmp_path, 
     monkeypatch.setattr(sys, "argv", ["check", str(tmp_path / "absent.json")])
     assert main() == 2
     assert json.loads(capsys.readouterr().out)["passed"] is False
+
+
+def test_only_tiny_closed_seam_roundoff_is_normalized():
+    data = samples()
+    outline = [list(p) for p in data["test"]["sections"][0]["points"][0]]
+    outline[-1] = [-2 + 5e-13, -1 + 1e-13]
+    data["test"]["sections"][0]["points"] = [outline]
+    assert checker()(data)["passed"]
+    data["test"]["sections"][0]["points"] = [[[0, 0], [1, 1], [0, 1], [1, 0], [0, 0]]]
+    with pytest.raises(ValueError, match="invalid generated polygon"):
+        checker()(data)
