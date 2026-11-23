@@ -11,6 +11,13 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 
 
 def worker(config):
+    # Bundled macOS Python does not add FreeCAD's extension directory itself.
+    if sys.platform == 'darwin':
+        resources=Path(sys.executable).resolve().parent.parent
+        modules=[p for p in resources.rglob('FreeCAD*.so')
+                 if p.name=='FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
+        if len(modules)!=1:raise RuntimeError(f'Expected one FreeCAD module under {resources}: {modules}')
+        sys.path.insert(0,str(modules[0].parent))
     import FreeCAD as A
     from native_fixtures import plate
     from integrations.cadwiz_plugin.bridge import Bridge
@@ -64,7 +71,13 @@ def run():
         env=dict(os.environ);env['CADWIZ_NATIVE_BRIDGE_WORKER']=json.dumps({'folder':str(folder),'select':select})
         log=open(folder/f'worker-{len(processes)}.log','w')
         p=subprocess.Popen([sys.executable,str(Path(__file__).resolve())],env=env,stdout=log,stderr=log)
-        processes.append((p,log));wait(lambda:(folder/'ready.json').exists());return p
+        processes.append((p,log))
+        def ready():
+            if p.poll() is not None:
+                log.flush()
+                raise RuntimeError(f'Native worker exited {p.returncode}: '+Path(log.name).read_text())
+            return (folder/'ready.json').exists()
+        wait(ready);return p
     try:
         old=launch(True)
         assert server.call('inspect_document',{})['ok']
