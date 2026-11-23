@@ -38,3 +38,9 @@ def test_freecad_is_started_only_when_it_is_not_already_running(monkeypatch) -> 
     monkeypatch.setattr(launch, "freecad_running", lambda: False)
     launch.main(start=started.append)
     assert len(started) == 1 and started[0][0].lower().endswith("freecad.exe")
+
+
+def test_cli_preference_never_launches_an_unrequested_desktop_assistant():
+    calls=[]
+    assert launch.open_assistant('codex_cli',lambda app:calls.append(app),calls.append)=='none'
+    assert calls==[]

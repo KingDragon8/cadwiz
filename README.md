@@ -12,8 +12,8 @@ before the first change, and never deletes anything of yours.
 
 You tell CADWiz what you want in plain words ("make the lip 18 mm tall", "what's
 the wall thickness here?", "make me a phone stand"). It works with the assistant
-app **you** choose: **Claude** or **ChatGPT**. Pick one at the top of the panel,
-or let CADWiz use whichever is open. CADWiz does the work in FreeCAD; the app is
+app **you** choose: **Claude Desktop**, **Codex Desktop**, or **Codex CLI** independently.
+Choose the route in **AI Wiz Setup**. CADWiz does the work in FreeCAD; the assistant is
 just how you talk to it. CADWiz makes no paid calls of its own.
 
 ![The CADWiz panel docked in FreeCAD](docs/img/cadwiz-panel-in-freecad.png)

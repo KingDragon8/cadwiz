@@ -65,6 +65,9 @@ def open_assistant(choice: str, ask: Callable[[str], dict[str, Any]] = ask_windo
                    opener: Callable[[str], None] = open_app) -> str:
     """Open the chosen app unless it (or, for "auto", either) is already running.
     Returns what happened: 'running:<app>', 'opened:<app>' or 'none'."""
+    if choice == 'codex_cli':
+        # CLI preference is independent of desktop applications. Leave its terminal alone.
+        return 'none'
     candidates = list(APPS) if choice not in APPS else [choice]
     found = {}
     for app in candidates:

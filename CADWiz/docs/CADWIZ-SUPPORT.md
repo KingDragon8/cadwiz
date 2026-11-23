@@ -1,4 +1,12 @@
-# CADWiz support — 0.9.4
+# CADWiz support — 0.9.5
+
+## Connection recovery and ordinary-language status
+
+After upgrading, restart FreeCAD and the connected assistant/CLI so both load the updated bridge and diagnostic tools. Save work first; do not close unsaved projects merely to diagnose a connection.
+
+Ask "Am I connected?", "What is my AI status?" or "Is my account working?" The assistant should call CADWiz's native diagnostic_status tool, not guess from the green light or require slash syntax. connection_status lists authenticated FreeCAD instances. Codex CLI account questions reuse its native login-status probe; account plans and remaining quota are unknown when unavailable.
+
+If the selected bridge stops answering, read-only inspection may recover only when exactly one replacement has the same known saved active document. Press Connect in the intended existing window before editing the replacement. Unknown, unsaved or ambiguous documents require explicit selection. A denied socket/process probe is not proof that FreeCAD is closed or the PID is stale. Check startup output and environment permissions without weakening system protections. Never substitute a standalone macro/new GUI for an unreachable intended edit target.
 
 Start with read-only checks. Preserve open documents, unsaved work, preferences,
 old installs and backups. Never launch an extra FreeCAD GUI for diagnosis or a
