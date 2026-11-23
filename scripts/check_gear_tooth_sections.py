@@ -63,7 +63,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         result = check_sections(json.loads(args.samples.read_text(encoding="utf-8")), args.tolerance_mm)
-    except (ImportError, KeyError, TypeError, ValueError) as exc:
+    except (ImportError, KeyError, TypeError, ValueError, OSError) as exc:
         print(json.dumps({"passed": False, "error": str(exc)}))
         return 2
     print(json.dumps(result, indent=2))

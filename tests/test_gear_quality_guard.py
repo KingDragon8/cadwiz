@@ -74,3 +74,13 @@ def test_missing_intermediate_samples_and_coarse_sampling_cannot_pass():
         check(data)
     with pytest.raises(ValueError, match="too coarse"):
         check(samples(), .001)
+
+
+def test_missing_sample_file_returns_an_explicit_failure(monkeypatch, tmp_path, capsys):
+    import json
+    import sys
+
+    main = checker().__globals__["main"]
+    monkeypatch.setattr(sys, "argv", ["check", str(tmp_path / "absent.json")])
+    assert main() == 2
+    assert json.loads(capsys.readouterr().out)["passed"] is False

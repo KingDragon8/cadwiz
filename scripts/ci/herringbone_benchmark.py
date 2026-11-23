@@ -119,10 +119,10 @@ def run():
     print(json.dumps(report, indent=2), flush=True); A.closeDocument(d.Name)
 
 
-if __name__ == '__main__':
-    result = 0
-    try:
-        run()
-    except BaseException:
-        traceback.print_exc(); result = 1
-    sys.stdout.flush(); sys.stderr.flush(); os._exit(result)
+# FreeCADCmd executes scripts with its own module name; do not silently skip.
+result = 0
+try:
+    run()
+except BaseException:
+    traceback.print_exc(); result = 1
+sys.stdout.flush(); sys.stderr.flush(); os._exit(result)
