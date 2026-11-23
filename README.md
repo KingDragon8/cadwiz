@@ -12,8 +12,8 @@ before the first change, and never deletes anything of yours.
 
 You tell CADWiz what you want in plain words ("make the lip 18 mm tall", "what's
 the wall thickness here?", "make me a phone stand"). It works with the assistant
-app **you** choose: **Claude** or **ChatGPT**. Pick one at the top of the panel,
-or let CADWiz use whichever is open. CADWiz does the work in FreeCAD; the app is
+app **you** choose: **Claude Desktop**, **Codex Desktop**, or **Codex CLI** independently.
+Choose the route in **AI Wiz Setup**. CADWiz does the work in FreeCAD; the assistant is
 just how you talk to it. CADWiz makes no paid calls of its own.
 
 ![The CADWiz panel docked in FreeCAD](docs/img/cadwiz-panel-in-freecad.png)
@@ -57,7 +57,7 @@ available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**Beta 0.9.4.** Adds model-aware gear animation and static-model turntables, a gear tooth-quality warning, and intermediate-section regression checks using native helical gears. Keeps 0.9.3 connection and installer improvements. See [0.9.4 changes](docs/RELEASE-NOTES-0.9.4.md).
+**Beta 0.9.5.** Adds model-aware gear animation and static-model turntables, a gear tooth-quality warning, and intermediate-section regression checks using native helical gears. Keeps 0.9.3 connection and installer improvements. See [0.9.5 changes](docs/RELEASE-NOTES-0.9.5.md).
 and the Free AIWiz features from 0.8.8.
 
 - **Works:** seeing and measuring your model; building and editing parts as

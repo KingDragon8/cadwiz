@@ -20,6 +20,8 @@ def test_release_metadata_and_extension_agree():
     with zipfile.ZipFile(ROOT/'CADWiz/Resources/CADWiz.mcpb') as archive:
         assert json.loads(archive.read('manifest.json')) == manifest
     assert manifest['version'] == version
+    assert version in (ROOT/'CADWiz/docs/CADWIZ-SUPPORT.md').read_text(encoding='utf-8').splitlines()[0]
+    assert f'describes version {version}.' in (ROOT/'CADWiz/docs/AGENTS.md').read_text(encoding='utf-8')
     assert (ROOT/'Install-CADWiz.command').is_file()
 
 

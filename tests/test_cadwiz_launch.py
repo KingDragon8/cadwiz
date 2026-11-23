@@ -5,6 +5,7 @@ assistant app together -- never a second FreeCAD, never closing anything."""
 from __future__ import annotations
 
 from integrations.cadwiz_plugin import launch
+from pathlib import Path
 
 
 def look(running: set[str], installed: set[str]):
@@ -28,6 +29,7 @@ def test_a_chosen_app_is_the_one_opened_and_a_missing_one_opens_nothing() -> Non
 
 def test_freecad_is_started_only_when_it_is_not_already_running(monkeypatch) -> None:
     started: list[list[str]] = []
+    monkeypatch.setattr(launch, 'freecad_exe', lambda: Path('/fixture/freecad.exe'))
     monkeypatch.setattr(launch, "chosen_app", lambda: "claude")
     monkeypatch.setattr(launch, "open_assistant", lambda choice: "running:claude")
     monkeypatch.setattr(launch, "freecad_running", lambda: True)
@@ -36,3 +38,9 @@ def test_freecad_is_started_only_when_it_is_not_already_running(monkeypatch) -> 
     monkeypatch.setattr(launch, "freecad_running", lambda: False)
     launch.main(start=started.append)
     assert len(started) == 1 and started[0][0].lower().endswith("freecad.exe")
+
+
+def test_cli_preference_never_launches_an_unrequested_desktop_assistant():
+    calls=[]
+    assert launch.open_assistant('codex_cli',lambda app:calls.append(app),calls.append)=='none'
+    assert calls==[]

@@ -22,4 +22,4 @@ is logged.
 """
 
 #: The release this code belongs to (shown in error reports and the Get help form).
-CADWIZ_VERSION = "0.9.4"
+CADWIZ_VERSION = "0.9.5"

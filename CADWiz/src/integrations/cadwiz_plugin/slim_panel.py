@@ -679,6 +679,7 @@ class _Panel:
         info.setSpacing(2)
         self.light = QtWidgets.QLabel(header)
         self.light.setObjectName("CADWiz_Connection_Light")
+        self.light.setToolTip("A connected light confirms a recent authenticated CADWiz heartbeat. It does not verify your AI account, subscription, or a successful model edit. Ask your assistant for connection or account status.")
         self.light.setProperty("role", "light")
         self.todo = QtWidgets.QLabel(header)
         self.todo.setObjectName("CADWiz_Connection_Todo")

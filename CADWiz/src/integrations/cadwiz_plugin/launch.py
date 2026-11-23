@@ -30,12 +30,25 @@ from integrations.cadwiz_plugin.connect_claude import APPS, NO_WINDOW, ask_windo
 
 def freecad_exe() -> Path:
     """freecad.exe beside the Python running this (the shortcut uses FreeCAD's own)."""
-    return Path(sys.executable).resolve().with_name("freecad.exe")
+    python = Path(sys.executable).resolve()
+    if sys.platform == 'darwin':
+        for parent in python.parents:
+            if parent.suffix == '.app':
+                return parent / 'Contents/MacOS/FreeCAD'
+        raise FileNotFoundError('Run the shortcut using the installed FreeCAD app Python.')
+    return python.with_name('freecad.exe' if sys.platform == 'win32' else 'freecad')
 
 
 def freecad_running() -> bool:
+    if sys.platform != 'win32':
+        done = subprocess.run(['ps', '-A', '-o', 'comm='], capture_output=True, text=True, timeout=10)
+        if done.returncode:
+            raise OSError('Cannot inspect running FreeCAD instances; refusing to launch a duplicate.')
+        return any(Path(line.strip()).name.lower() in ('freecad', 'freecad.exe') for line in done.stdout.splitlines())
     done = subprocess.run(["tasklist", "/FI", "IMAGENAME eq freecad.exe", "/NH"], capture_output=True, text=True,
                           timeout=10, creationflags=NO_WINDOW)
+    if done.returncode:
+        raise OSError('Cannot inspect running FreeCAD instances; refusing to launch a duplicate.')
     return "freecad.exe" in done.stdout.lower()
 
 
@@ -52,6 +65,9 @@ def open_assistant(choice: str, ask: Callable[[str], dict[str, Any]] = ask_windo
                    opener: Callable[[str], None] = open_app) -> str:
     """Open the chosen app unless it (or, for "auto", either) is already running.
     Returns what happened: 'running:<app>', 'opened:<app>' or 'none'."""
+    if choice == 'codex_cli':
+        # CLI preference is independent of desktop applications. Leave its terminal alone.
+        return 'none'
     candidates = list(APPS) if choice not in APPS else [choice]
     found = {}
     for app in candidates:
@@ -70,8 +86,8 @@ def open_assistant(choice: str, ask: Callable[[str], dict[str, Any]] = ask_windo
 
 
 def main(start: Callable[[list[str]], Any] = subprocess.Popen) -> int:
-    exe = freecad_exe()
     if not freecad_running():
+        exe = freecad_exe()
         start([str(exe)])
     open_assistant(chosen_app())
     return 0

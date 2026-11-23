@@ -63,7 +63,7 @@ def test_explicit_panel_selection_saves_no_connection_secret(tmp_path):
     try:
         bridge.select_current()
         selected = json.loads((tmp_path / 'selected-window.json').read_text())
-        assert selected == {key: bridge.identity[key] for key in ('pid', 'started_utc')}
+        assert selected == {key: bridge.identity[key] for key in ('pid', 'started_utc', 'instance_id')}
         assert 'token' not in selected
     finally:
         bridge.stop()
