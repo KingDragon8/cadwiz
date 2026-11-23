@@ -83,8 +83,8 @@ def open_assistant(choice: str, ask: Callable[[str], dict[str, Any]] = ask_windo
 
 
 def main(start: Callable[[list[str]], Any] = subprocess.Popen) -> int:
-    exe = freecad_exe()
     if not freecad_running():
+        exe = freecad_exe()
         start([str(exe)])
     open_assistant(chosen_app())
     return 0

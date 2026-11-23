@@ -32,6 +32,7 @@ def test_live_connection_is_verified_per_assistant(tmp_path):
 
 def test_openai_app_lookup_targets_codex_identity(monkeypatch):
     from integrations.cadwiz_plugin import connect_claude
+    monkeypatch.setattr(connect_claude.sys, 'platform', 'win32')
     calls = []
     def run(args, **kwargs):
         calls.append(args)
