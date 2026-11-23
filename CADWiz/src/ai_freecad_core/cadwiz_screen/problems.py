@@ -16,6 +16,7 @@ from ai_freecad_core.visual_communications.anchored import inches_first
 
 #: kind -> (plain heading, how to resolve it)
 KINDS: dict[str, tuple[str, str]] = {
+    "gear_profile": ("Check the gear tooth shape", "Use smooth helical gear features and check tooth sections between construction profiles before printing."),
     "connection": ("Your assistant can't reach CADWiz", "Open your assistant app (Claude Desktop, or the ChatGPT app), or quit it fully and open it again; the light turns green within a minute."),
     "rebuild": ("A step of the model failed to rebuild", "Ask Claude to fix it, or go back to the last version that rebuilt."),
     "sketch_open": ("A sketch has a gap in its outline", "Close the gap so the outline is one closed loop; your assistant can find and join the ends."),
@@ -32,6 +33,7 @@ KINDS: dict[str, tuple[str, str]] = {
 
 #: "Explain": why it matters, in a few plain sentences (no FreeCAD jargon unexplained).
 EXPLAIN: dict[str, str] = {
+    "gear_profile": "A gear can be a closed solid yet have distorted teeth between the outlines used to build it. Hiding display lines does not correct that shape. This warning identifies a construction that needs checking; it does not prove a defect or certify other gears.",
     "connection": "CADWiz talks to Claude through a small connector the Claude app starts. While it is not connected, Claude "
                   "can't look at your model, measure it or change it. Nothing of yours is lost.",
     "rebuild": "FreeCAD builds a model step by step, each step from the one before. When one step can't be made (a fillet too "

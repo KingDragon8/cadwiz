@@ -780,7 +780,7 @@ class _Panel:
         self.animate_button.setObjectName("CADWiz_View_Animate")
         self.animate_button.setProperty("role", "view")
         self.animate_button.setCheckable(True)
-        self.animate_button.setToolTip("Preview the crank and roller moving. Click again to stop and restore. This is a motion preview, not a force simulation.")
+        self.animate_button.setToolTip("Animate the model shown: recognized mechanisms move their parts; other models use a turntable preview. Click again to restore. No force simulation.")
         self.animate_button.clicked.connect(self.toggle_animation)
         views.addWidget(self.animate_button)
         self.learn_button = QtWidgets.QPushButton("Learn", page)
@@ -1302,6 +1302,7 @@ class _Panel:
             self.motion = None
         with contextlib.suppress(RuntimeError):
             self.animate_button.setChecked(False)
+            self.animate_button.setText("Animate")
             from integrations.cadwiz_plugin import view_link
             self._marks_allowed(not view_link.is_exploded(self.document()))
         self.picture_signature = None
@@ -1323,12 +1324,21 @@ class _Panel:
         if not self.animate_button.isChecked():
             self.stop_animation()
             return
+        document = self.document()
+        from integrations.cadwiz_plugin.general_motion import drawable
+        if not drawable(document):
+            self.stop_animation()
+            self.flash("Open a 3D model before starting Animate.", FOUNDER_BLUE, seconds=5.0)
+            return
         if self.assembly_button.isChecked():
             self.assembly_button.setChecked(False)
             self.toggle_assembly()
         try:
-            view_link.activate_document_view(self.gui(), self.document())
-            self.motion = MotionPreview(self.document())
+            view_link.activate_document_view(self.gui(), document)
+            self.motion = MotionPreview(document)
+            self.animate_button.setText(getattr(self.motion, "button_text", "Stop motion"))
+            self.animate_button.setToolTip(getattr(self.motion, "description", "Motion preview; click to stop and restore."))
+            self.snug_buttons()
             self._marks_allowed(False)
             for button in self.tool_buttons.values():
                 button.setToolTip("Stop Animate before marking the model.")

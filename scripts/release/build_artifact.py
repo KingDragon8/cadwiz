@@ -37,7 +37,7 @@ def main() -> None:
             parts = Path(name).parts
             assert not any(p in {".git", ".env", ".secrets", "__pycache__"} for p in parts), name
             assert not name.lower().endswith((".fcstd", ".fcstd1")), name
-        for module in ["learning.py", "motion_preview.py", "offline_launcher.py"]:
+        for module in ["learning.py", "motion_preview.py", "general_motion.py", "gear_quality.py", "offline_launcher.py"]:
             assert prefix + "CADWiz/src/integrations/cadwiz_plugin/" + module in names, module
         for platform in ["win32-x86_64-cp311", "darwin-arm64-cp311", "darwin-x86_64-cp311", "linux-x86_64-cp311"]:
             assert any(platform in name and name.endswith(".whl") for name in names), platform

@@ -89,7 +89,7 @@ def test_view_nodes_cleaned_and_existing_geometry_preserved(monkeypatch):
 
 
 def test_incomplete_model_is_untouched():
-    with pytest.raises(ValueError, match="complete toothpaste"):
+    with pytest.raises(ValueError, match="Open a 3D model"):
         motion_preview.MotionPreview(SimpleNamespace(getObject=lambda name: None))
 
 
