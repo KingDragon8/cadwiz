@@ -34,8 +34,12 @@ def main():
     (folder/'settings.json').write_text(json.dumps({'cad_folders':[str(folder)]}))
     def make(name,path,length):
         doc=app.newDocument(name);obj=doc.addObject('Part::Box','Solid')
-        obj.Length=length;doc.Label='Shared';doc.recompute();doc.saveAs(str(path));return doc
+        obj.Length=length;doc.recompute();doc.saveAs(str(path))
+        # Native saveAs resets the document label to its filename. Set the
+        # shared label afterward so separate sessions truly collide in history.
+        doc.Label='Shared';doc.save();return doc
     a=make('CaseLower',a_path,10);b=make('CaseUpper',b_path,20)
+    assert a.Label==b.Label=='Shared', 'History-collision precondition required'
     sha=lambda path:hashlib.sha256(path.read_bytes()).hexdigest()
     original=[sha(a_path),sha(b_path)]
     session=PluginSession(app=app,gui=None,project_root=folder/'projects',log_path=folder/'calls.jsonl')
