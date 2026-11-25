@@ -13,8 +13,10 @@ def check(app, gui, folder, panel):
     from ai_freecad_core.visual_communications.anchored import AnchoredMark
     from ai_freecad_core.visual_communications.contracts import VisualMarkKind
     folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    progress={}
     def stage(name, **details):
-        (folder/'progress.json').write_text(json.dumps({'stage':name, **details},indent=2))
+        progress.update(details);progress['stage']=name
+        (folder/'progress.json').write_text(json.dumps(progress,indent=2))
     stage('creating-representative-variants')
     before_pid=os.getpid()
     a=pulley('GUI_Variant_A',folder/'Variant_A.FCStd')
@@ -59,7 +61,7 @@ def check(app, gui, folder, panel):
     selected=view_link.selection(gui)
     assert selected and selected[0]['geometry_references'],selected
     operation=intent(target);operation['reference']=references[0]['reference']
-    stage('starting-protected-native-edit')
+    stage('starting-protected-native-edit',intent=operation)
     result=session.call('annular_edit',{'document':target.Name,'intent':operation})
     stage('native-edit-returned', result=result)
     assert result.get('ok') and result.get('verification_status')=='VERIFIED SUCCESS',result

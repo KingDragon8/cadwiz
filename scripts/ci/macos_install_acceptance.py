@@ -126,6 +126,14 @@ QtCore.QTimer.singleShot(12000, finish)
             command = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)', *command]
         run(command)
         record = json.loads(result_file.read_text())
+        if label == 'clean-install' and record.get('error'):
+            # Capture the actual headless snapshot descriptors, without changing
+            # the fixture or concealing the original GUI assertion failure.
+            fixture=out/'neil-gui'/'Working.FCStd'
+            if fixture.is_file():
+                probe=subprocess.run([str(python),str(repo/'scripts/ci/native_reference_probe.py'),str(fixture),str(fixture.parent/'worker-reference.json')],
+                                     env=env,capture_output=True,text=True,timeout=30)
+                (out/'reference-probe.log').write_text(probe.stdout+probe.stderr)
         assert record['workbench_registered'] and record['panel_visible'], record
         assert record['support_button_visible'] and record['working_file_button_visible'], record
         if label == 'clean-install':
