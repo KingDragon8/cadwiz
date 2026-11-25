@@ -46,7 +46,9 @@ def run():
     assert not result.get('ok'),result
     assert hashlib.sha256(Path(filename).read_bytes()).hexdigest()==digest
     # Direct-solid results require a persisted, visible exception, never a silent fallback.
-    result=session.call('build_model',{'new_document':'DirectRejected','code':"import Part; o=doc.addObject('Part::Feature','Solid'); o.Shape=Part.makeBox(10,20,3)"})
+    from integrations.cadwiz_plugin.document_actions import user_document_operation
+    assert user_document_operation(session,{'mode':'new','target_path':str(session.project.folder/'DirectRejected.FCStd')})['ok']
+    result=session.call('build_model',{'document':A.ActiveDocument.Name,'code':"import Part; o=doc.addObject('Part::Feature','Solid'); o.Shape=Part.makeBox(10,20,3)"})
     assert not result.get('ok'),result
     result=session.call('design_record',{'action':'update','fields':{'construction_exception':'User-supplied imported solid has no original native feature history; retain this direct representation explicitly.'}})
     assert result.get('ok'),result
@@ -65,3 +67,4 @@ except BaseException:
 sys.stdout.flush()
 sys.stderr.flush()
 os._exit(result)
+

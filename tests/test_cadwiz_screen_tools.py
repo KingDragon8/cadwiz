@@ -111,6 +111,7 @@ def session(tmp_path, monkeypatch):
     gui = SimpleNamespace(Selection=SimpleNamespace(getSelectionEx=lambda: picked), ActiveDocument=None)
     s = PluginSession(app=app, gui=gui, project_root=tmp_path / "projects", executor_factory=_Executor, log_path=tmp_path / "calls.jsonl")
     s.doc = doc
+    assert s.call('document_operation', {'mode': 'modify', 'document': doc.Name})['ok']
     return s
 
 

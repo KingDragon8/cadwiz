@@ -33,7 +33,9 @@ def session(tmp_path, monkeypatch):
     (tmp_path / "settings.json").write_text(json.dumps({"cad_folders": [str(tmp_path)]}))
     doc = SimpleNamespace(Name="Lure", Label="Lure", FileName=str(tmp_path / "Lure.FCStd"), Objects=[])
     app = SimpleNamespace(listDocuments=lambda: {"Lure": doc}, ActiveDocument=doc, setActiveDocument=lambda n: None)
-    return PluginSession(app=app, project_root=tmp_path / "projects", log_path=tmp_path / "calls.jsonl")
+    result = PluginSession(app=app, project_root=tmp_path / "projects", log_path=tmp_path / "calls.jsonl")
+    assert result.call('document_operation', {'mode': 'modify', 'document': doc.Name})['ok']
+    return result
 
 
 # ---- user_preferences -----------------------------------------------------------------------

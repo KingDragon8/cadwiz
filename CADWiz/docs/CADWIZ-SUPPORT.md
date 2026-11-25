@@ -1,4 +1,17 @@
-# CADWiz support — 0.9.5
+# CADWiz support — 1.0.0
+
+## Get help from the home panel
+
+Press **Get help — assistant or email** on the CADWiz home panel. Choose your
+connected assistant, or email **support@cadwiz.app**. Automatic software support
+covers downloads, installation, connection problems, errors and feature questions.
+Describe what happened, your CADWiz and FreeCAD versions, and your operating system.
+Reply in the same email thread to continue the conversation. Replies may be automated;
+software fixes still require validation and owner approval before release.
+
+The support service does not build CAD models for you. Your model, credentials and
+diagnostic reports are never attached automatically. Review any report before sharing.
+For the current service status and contact options, visit https://cadwiz.app/support.
 
 ## Connection recovery and ordinary-language status
 

@@ -39,9 +39,11 @@ from ai_freecad_core.ai_master.flags import read_settings, write_setting
 from ai_freecad_core.ai_master.project_store import Project
 from ai_freecad_core.ai_master.units import both
 from ai_freecad_core.conversation.founder_words import PLAIN_ERROR, clean_reply
+from integrations.cadwiz_plugin.engineering_control import ControlError
 
 PROJECT_NAME = "CADWiz plug-in"
 TOOL_NAMES = ("inspect_document", "measure", "render", "build_model", "edit_object", "versions", "check_print", "export",
+              "document_operation", "resolve_geometry", "annular_edit",
               "open_document", "save_document", "design_record", "contract_check",
               # ORDER-2026-10-18-01: the Visual Communications Screen he and Claude share
               "shown_to_claude", "mark_for_user", "get_selection",
@@ -101,6 +103,8 @@ class PluginSession:
         self.log_path = Path(log_path) if log_path else plugin_data_dir() / "tool-calls.jsonl"
         self.register_project_root(self.project.folder)
         self._section_runner = section_runner
+        self.document_authority = None
+        self._failed_engineering_intents = set()
         #: What the slim panel shows: the document and object being worked on, its
         #: version, its key measurements, the last change in one line, and the
         #: newest picture of the model (ORDER-2026-10-15-01).
@@ -115,14 +119,31 @@ class PluginSession:
     # ---- the one entry point ----------------------------------------------------------
     def call(self, tool: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         args = dict(arguments or {})
+        mutating = False
         started = time.monotonic()
         entry: dict[str, Any] = {"utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tool": tool,
                                  "arguments": {k: (v[:400] + "..." if isinstance(v, str) and len(v) > 400 else v) for k, v in args.items()}}
         try:
             if tool not in TOOL_NAMES:
                 raise PlainError(f"CADWiz has no tool called {tool!r}.")
+            mutating = tool in ('build_model', 'edit_object', 'save_document', 'mesh_edit', 'swap_part', 'repair_mesh', 'import_mesh', 'annular_edit', 'construction_visibility') or (tool == 'versions' and args.get('action', 'list') != 'list')
+            safe_new = tool == 'build_model' and (args.get('new_document') or (args.get('document') is None and getattr(self.app, 'ActiveDocument', None) is None))
+            if mutating and self.document_authority is None and not safe_new:
+                raise ControlError('USER INPUT REQUIRED', 'Bind the requested source and working document with document_operation (modify, new or variant) before editing. An active window alone does not authorize a target.')
+            if mutating and self.document_authority is not None:
+                if args.get('new_document') or (tool == 'save_document' and args.get('path') and Path(args['path']).resolve() != Path(self.document_authority.target_path).resolve()):
+                    raise ControlError('TARGET UNRESOLVED', 'The working target is already protected. Retry on document=' + self.document_authority.target_path + ' and omit new_document. Use the Working file button only to authorize a different target.')
+                self.document_authority.check(self.app, self._document(args.get('document')))
             result = getattr(self, "_" + tool)(**args)
             result = {"ok": True, **result} if "ok" not in result else result
+            if mutating:
+                result.setdefault('verification_status', 'PARTIALLY VERIFIED' if result.get('ok') else 'VERIFICATION FAILED')
+                if self.document_authority is not None:
+                    self.document_authority.check_source(self.app)
+                    result['document_authority'] = self.document_authority.record()
+                self.state['verification_status'] = result['verification_status']
+        except ControlError as error:
+            result = {'ok': False, 'verification_status': error.status, 'say_to_founder': str(error)}
         except PlainError as error:
             result = {"ok": False, "say_to_founder": str(error)}
         except PermissionError as error:
@@ -134,6 +155,10 @@ class PluginSession:
             entry["traceback"] = traceback.format_exc()[-2000:]
             result = {"ok": False, "say_to_founder": PLAIN_ERROR, "detail_for_claude": f"{type(error).__name__}: {error}"[:600]}
             self._attach_report(result, "CW-PLUGIN-FAIL", tool)
+        if mutating:
+            result.setdefault('verification_status', 'PARTIALLY VERIFIED' if result.get('ok') else 'VERIFICATION FAILED')
+            self.state['verification_status'] = result['verification_status']
+            result['engineering_verified'] = result['verification_status'] == 'VERIFIED SUCCESS'
         entry.update(ok=bool(result.get("ok")), seconds=round(time.monotonic() - started, 2),
                      **({"detail": result.get("detail_for_claude", "")} if not result.get("ok") else {}))
         with contextlib.suppress(OSError):
@@ -175,9 +200,14 @@ class PluginSession:
     def _document(self, name: str | None = None) -> Any:
         documents = dict(self.app.listDocuments() or {})
         if name:
-            for key, document in documents.items():
-                if name in (key, getattr(document, "Label", ""), Path(str(getattr(document, "FileName", "") or "")).stem):
-                    return document
+            if name in documents:
+                return documents[name]
+            exact = [d for d in documents.values() if str(getattr(d, 'FileName', '') or '') and Path(d.FileName).resolve() == Path(name).resolve()]
+            matches = exact or [d for d in documents.values() if name in (getattr(d, 'Label', ''), Path(str(getattr(d, 'FileName', '') or '')).stem)]
+            if len(matches) == 1:
+                return matches[0]
+            if len(matches) > 1:
+                raise PlainError('That document name is ambiguous. Use its exact document Name or full file path.')
             raise PlainError(f"There is no open document called {name!r}; the open ones are: {', '.join(d.Label for d in documents.values()) or 'none'}.")
         document = getattr(self.app, "ActiveDocument", None)
         if document is None and documents:
@@ -185,6 +215,92 @@ class PluginSession:
         if document is None:
             raise PlainError("Nothing is open in FreeCAD yet. Open a model, or ask me to build one.")
         return document
+
+    def _document_operation(self, mode: str, document: str | None = None, source_path: str | None = None,
+                            target_path: str | None = None) -> dict[str, Any]:
+        """Bind one explicit operation to a canonical target; unrelated files stay protected."""
+        from integrations.cadwiz_plugin.engineering_control import ControlError, DocumentAuthority, live_state_fingerprint, file_hash
+        if mode not in ('inspect', 'modify', 'variant', 'new'):
+            raise ControlError('UNSUPPORTED OPERATION', 'Choose inspect, modify, variant or new.')
+        if self.document_authority is not None:
+            requested = Path(target_path).resolve() if target_path else Path(str(self._document(document).FileName)).resolve()
+            if requested == Path(self.document_authority.target_path).resolve() and mode == 'modify' and self.document_authority.mode in ('new', 'variant', 'modify'):
+                self.document_authority.check(self.app, self._document(document))
+                return {'document': self._document(document).Name, 'file': self.document_authority.target_path, 'document_authority': self.document_authority.record()}
+            if requested != Path(self.document_authority.target_path).resolve() or mode != self.document_authority.mode:
+                raise ControlError('USER INPUT REQUIRED', 'A working document is already protected. Use the Working file button to authorize a different target.')
+        if mode in ('variant', 'new'):
+            if not target_path or Path(target_path).suffix.lower() != '.fcstd':
+                raise ControlError('USER INPUT REQUIRED', 'Give a new, separately named .FCStd file.')
+            destination = Path(target_path).resolve()
+            folders = cad_folders([str(self.project.folder)] + [str(Path(d.FileName).parent) for d in self.app.listDocuments().values() if getattr(d, 'FileName', '')])
+            if not inside(destination, folders) or not destination.parent.is_dir() or destination.exists():
+                raise ControlError('TARGET UNRESOLVED', 'Choose a new filename in an existing authorized CAD folder.')
+            source = None
+            if mode == 'variant':
+                if not source_path or not Path(source_path).is_file():
+                    raise ControlError('TARGET UNRESOLVED', 'Give the exact existing source .FCStd path; variants are never selected by similarity.')
+                source_file = Path(source_path).resolve()
+                if source_file.suffix.lower() != '.fcstd' or not inside(source_file, folders):
+                    raise ControlError('TARGET UNRESOLVED', 'The source must be a native FreeCAD file in an authorized CAD folder.')
+                self._open_document(str(source_file))
+                source = self._document(str(source_file))
+                if bool(getattr(source, 'Modified', False)):
+                    raise ControlError('USER INPUT REQUIRED', 'The source has unsaved changes. Save or review them before making a file-based variant.')
+                before = file_hash(source_file)
+                revision = live_state_fingerprint(source)
+                # Exclusive creation prevents even a concurrent filename collision
+                # from overwriting an existing user file.
+                with source_file.open('rb') as original, destination.open('xb') as copy:
+                    shutil.copyfileobj(original, copy)
+                if file_hash(destination) != before or file_hash(source_file) != before:
+                    raise ControlError('VERIFICATION FAILED', 'Source integrity changed during copying; the variant was not authorized.')
+                self._open_document(str(destination), native_copy=True)
+                target = self._document(str(destination))
+                authority = DocumentAuthority(mode, str(destination), target.Name, str(source_file), before, source.Name, revision)
+            else:
+                target = self.app.newDocument(_safe_doc_name(destination.stem))
+                target.saveAs(str(destination))
+                self.app.setActiveDocument(target.Name)
+                authority = DocumentAuthority(mode, str(destination), target.Name)
+        else:
+            target = self._document(document)
+            authority = DocumentAuthority(mode, str(getattr(target, 'FileName', '') or '') if mode == 'inspect' else self._file_of(target), target.Name)
+        self.document_authority = authority
+        self.state['document_authority'] = authority.record()
+        return {'document': target.Name, 'file': str(target.FileName), 'document_authority': authority.record(),
+                'verification_status': 'PARTIALLY VERIFIED', 'say_to_founder': 'Working document selected; geometry changes still require verification.'}
+
+    def _resolve_geometry(self, reference: dict[str, Any] | None = None, object: str | None = None,  # noqa: A002
+                          element: str | None = None, document: str | None = None) -> dict[str, Any]:
+        from integrations.cadwiz_plugin.engineering_control import ControlError, geometry_reference, resolve_reference
+        target = self._document(document)
+        if reference:
+            return {'reference': resolve_reference(target, reference)}
+        obj = target.getObject(object or '')
+        if obj is None or not element:
+            raise ControlError('TARGET UNRESOLVED', 'Select one actual face or edge; a visual mark alone is not a resolved feature.')
+        return {'reference': geometry_reference(target, obj, element)}
+
+    def _annular_edit(self, intent: dict[str, Any], document: str | None = None) -> dict[str, Any]:
+        from integrations.cadwiz_plugin.engineering_control import ControlError
+        if self.document_authority is None:
+            raise ControlError('USER INPUT REQUIRED', 'Authorize the source and working document with document_operation first.')
+        target = self._document(document)
+        from integrations.cadwiz_plugin.engineering_control import resolve_reference
+        intent = dict(intent)
+        intent['reference'] = resolve_reference(target, intent.get('reference') or {})
+        from integrations.cadwiz_plugin.engineering_control import document_revision
+        fingerprint = dict(intent)
+        fingerprint['reference'] = {k: v for k, v in intent['reference'].items() if k not in ('timestamp', 're_resolved')}
+        key = document_revision(target) + json.dumps(fingerprint, sort_keys=True)
+        if key in self._failed_engineering_intents:
+            raise ControlError('USER INPUT REQUIRED', 'This exact operation already failed on this document revision. Correct the reported condition before retrying.')
+        executor = self._executor(target)
+        outcome = executor.annular_edit(intent)
+        if not outcome.get('success'):
+            self._failed_engineering_intents.add(key)
+        return self._after_change(executor, outcome)
 
     def _file_of(self, document: Any) -> str:
         """The document's file; an unsaved document gets one in the project folder first."""
@@ -226,6 +342,23 @@ class PluginSession:
         if adopt and not getattr(executor, "adoption", None):
             executor.adopt()
             executor.adopted_at_version = executor.store.latest()
+        from integrations.cadwiz_plugin.engineering_control import live_state_fingerprint, file_hash
+        def current_document():
+            return self._document(str(Path(file_name).resolve()))
+        def needs_snapshot():
+            live = current_document()
+            current = executor.store.current()
+            return bool(getattr(live, 'Modified', False)) or (current is not None and Path(file_name).is_file() and file_hash(file_name) != current.sha256)
+        def guard_before_apply(expected):
+            live = current_document()
+            actual = {'live': live_state_fingerprint(live), 'disk': file_hash(file_name) if Path(file_name).is_file() else None}
+            if actual != expected:
+                raise ControlError('ROLLED BACK', 'The working document changed during execution. Your newer work was preserved; inspect it before retrying.')
+            if self.document_authority is not None:
+                self.document_authority.check(self.app, live)
+        executor.needs_live_snapshot = needs_snapshot
+        executor.capture_operation_revision = lambda: {'live': live_state_fingerprint(current_document()), 'disk': file_hash(file_name) if Path(file_name).is_file() else None}
+        executor.check_operation_revision = guard_before_apply
         self.state.update(document=str(getattr(document, "Label", "")), file=file_name, object=str((executor.adoption or {}).get("main_object", "")))
         return executor
 
@@ -343,8 +476,13 @@ class PluginSession:
     def _after_change(self, executor: Any, outcome: dict[str, Any]) -> dict[str, Any]:
         if not outcome.get("success", True) and outcome.get("error"):
             error = str(outcome.get("error"))
+            if outcome.get('verification_status'):
+                return {'ok': False, 'verification_status': outcome['verification_status'],
+                        'detail_for_claude': error, 'health': outcome.get('health') or {},
+                        'say_to_founder': 'The edit failed verification. The last accepted working model was preserved.'}
             if outcome.get("health"):
                 return {"ok": False, "health": outcome["health"], "detail_for_claude": error,
+                        "verification_status": outcome.get('verification_status', 'VERIFICATION FAILED'),
                         "say_to_founder": "The result did not pass its editable-model or dimension checks. I kept the previous model; the construction needs correction."}
             line = outcome.get("error_line")
             raise _ScriptFailed(error + (f" (line {line})" if line else ""))
@@ -453,9 +591,14 @@ class PluginSession:
             with contextlib.suppress(Exception):
                 self.app.setActiveDocument(created.Name)
             document = created.Name
+            from integrations.cadwiz_plugin.engineering_control import DocumentAuthority
+            self.document_authority = DocumentAuthority('new', str(path.resolve()), created.Name)
+            self.state['document_authority'] = self.document_authority.record()
         target = self._document(document)
         executor = self._executor(target)
-        executor.require_parametric = True
+        # New designs are already required to prove editability in the worker.
+        # Existing legacy geometry retains its actual capability classification.
+        executor.require_parametric = False
         return self._after_change(executor, executor.edit_existing(code, note or "built by Claude"))
 
     def _edit_object(self, object: str | None = None, parameters: dict[str, Any] | None = None, script: str | None = None,  # noqa: A002
@@ -567,7 +710,7 @@ class PluginSession:
             result["slicer_scene_verified"] = False
         return result
 
-    def _open_document(self, path: str) -> dict[str, Any]:
+    def _open_document(self, path: str, *, native_copy: bool = False) -> dict[str, Any]:
         allowed = cad_folders([str(self.project.folder)] + [str(Path(str(getattr(d, "FileName", "") or ".")).parent)
                                                             for d in dict(self.app.listDocuments()).values() if getattr(d, "FileName", "")])
         if not inside(path, allowed):
@@ -581,7 +724,7 @@ class PluginSession:
         if existing is not None:
             # Re-present an open document; never reload over unsaved work.
             document = existing
-        elif self.gui is not None and callable(getattr(self.gui, "open", None)):
+        elif not native_copy and self.gui is not None and callable(getattr(self.gui, "open", None)):
             self.gui.open(str(path))
             document = next((d for d in self.app.listDocuments().values()
                              if getattr(d, "FileName", "") and Path(d.FileName).resolve() == Path(path).resolve()), None)
@@ -590,6 +733,8 @@ class PluginSession:
                 # Gui.open. Use the native loader in this same application.
                 document = self.app.openDocument(str(path))
         else:
+            # A verified native variant is already an explicitly chosen copy.
+            # Load it in this instance without the GUI import/open-dialog route.
             document = existing or self.app.openDocument(str(path))
         with contextlib.suppress(Exception):
             self.app.setActiveDocument(document.Name)

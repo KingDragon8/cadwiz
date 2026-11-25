@@ -32,7 +32,7 @@ def main():
     profile.mkdir()
     env = dict(os.environ, FREECAD_USER_HOME=str(profile), FREECAD_USER_DATA=str(profile),
                CADWIZ_SETTINGS_FILE=str(qa/'settings.json'), CADWIZ_SETUP_DIR=str(qa/'helper'),
-               CADWIZ_PLUGIN_BRIDGE='off', CADWIZ_CLIENT_APP='auto', LOCALAPPDATA=str(qa/'plugin-data'))
+               CADWIZ_PLUGIN_BRIDGE='on', CADWIZ_CLIENT_APP='auto', LOCALAPPDATA=str(qa/'plugin-data'))
     python = next(p for p in (args.app/'Contents/Resources/bin/python', args.app/'Contents/Resources/bin/python3') if p.is_file())
     modules = [p for p in args.app.rglob('FreeCAD*.so')
                if p.name == 'FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
@@ -40,7 +40,14 @@ def main():
     env['PYTHONPATH'] = str(modules[0].parent)
     gui = args.app/'Contents/MacOS/FreeCAD'
     def run(command):
-        result = subprocess.run(list(map(str, command)), env=env, capture_output=True, text=True, timeout=180)
+        try:
+            result = subprocess.run(list(map(str, command)), env=env, capture_output=True, text=True, timeout=180)
+        except subprocess.TimeoutExpired as error:
+            with (out/'commands.log').open('a') as log:
+                for value in (error.stdout, error.stderr):
+                    if value:
+                        log.write(value.decode('utf8',errors='replace') if isinstance(value,bytes) else value)
+            raise
         with (out/'commands.log').open('a') as log:
             log.write(result.stdout + result.stderr + '\n')
         assert result.returncode == 0, (command, result.stdout[-2000:], result.stderr[-2000:])
@@ -82,6 +89,8 @@ def finish():
         guidance = window.findChild(QtWidgets.QLabel, 'CADWiz_Communication_Guidance')
         aiwiz = window.findChild(QtWidgets.QTabWidget, 'CADWiz_AIWiz')
         content = window.findChild(QtWidgets.QWidget, 'CADWiz_Slim_Panel')
+        support = window.findChild(QtWidgets.QPushButton, 'CADWiz_Support_Help')
+        working = window.findChild(QtWidgets.QPushButton, 'CADWiz_Working_File')
         panel = getattr(content, '_cadwiz_panel', None)
         import integrations.cadwiz_plugin as plugin
         result = dict(workbench_registered=found, panel_visible=bool(dock and dock.isVisible()),
@@ -91,20 +100,37 @@ def finish():
                       guidance_present=bool(guidance and 'quick buttons above' in guidance.text()),
                       aiwiz_tabs=[aiwiz.tabText(i) for i in range(aiwiz.count())] if aiwiz else [],
                       restored_ai_choice=getattr(getattr(panel, 'free_ai', None), 'route', ''))
+        result['support_button_visible'] = bool(support and support.isVisible())
+        result['working_file_button_visible'] = bool(working and working.isVisible())
+        if RUN_NEIL_GUI:
+            import sys
+            sys.path.insert(0, NEIL_SCRIPTS)
+            from native_neil_gui_check import check
+            result['neil_native_gui'] = check(FreeCAD, FreeCADGui, NEIL_OUTPUT, panel)
     except Exception:
         result['error'] = traceback.format_exc()
     finally:
         Path(RESULT).write_text(json.dumps(result, indent=2))
+        if RUN_NEIL_GUI:
+            # Only disposable test documents; avoid an unsaved-file close prompt
+            # hiding a recorded assertion failure behind the outer timeout.
+            for document in list(FreeCAD.listDocuments().values()):
+                if document.FileName and Path(document.FileName).resolve().is_relative_to(Path(NEIL_OUTPUT).resolve()):
+                    FreeCAD.closeDocument(document.Name)
         window.close()
 QtCore.QTimer.singleShot(12000, finish)
-'''.replace('RESULT', repr(str(result_file))))
+'''.replace('RESULT', repr(str(result_file))).replace('RUN_NEIL_GUI', repr(label == 'clean-install'))
+   .replace('NEIL_SCRIPTS', repr(str(repo/'scripts/ci'))).replace('NEIL_OUTPUT', repr(str(out/'neil-gui'))))
         command = [gui, macro]
         if offline:
             command = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)', *command]
         run(command)
         record = json.loads(result_file.read_text())
         assert record['workbench_registered'] and record['panel_visible'], record
-        assert record['cadwiz_version'] == '0.9.5', record
+        assert record['support_button_visible'] and record['working_file_button_visible'], record
+        if label == 'clean-install':
+            assert record['neil_native_gui']['status'] == 'PASS', record
+        assert record['cadwiz_version'] == '1.0.0', record
         assert record['communication_title'] == 'Wiz communication screen' and record['guidance_present'], record
         assert record['aiwiz_tabs'] == ['AI Wiz Setup', 'AI Wiz Management'], record
         assert Path(record['loaded_source']).samefile(mod/'CADWiz'), record

@@ -116,12 +116,14 @@ def session(tmp_path, monkeypatch):
                           setActiveDocument=lambda n: None, newDocument=lambda n: _Doc(n, ""))
     s = PluginSession(app=app, project_root=tmp_path / "projects", executor_factory=_Executor, log_path=tmp_path / "calls.jsonl")
     s.doc = doc
+    assert s.call('document_operation', {'mode': 'modify', 'document': doc.Name})['ok']
     return s
 
 
 def test_the_tool_set_is_the_founders_list() -> None:
     assert set(TOOL_NAMES) == {"inspect_document", "measure", "render", "build_model", "edit_object", "versions", "check_print", "export",
                                "open_document", "save_document", "design_record", "contract_check",
+                                   "document_operation", "resolve_geometry", "annular_edit",
                                # ORDER-2026-10-18-01: the screen he and Claude share
                                "shown_to_claude", "mark_for_user", "get_selection",
                                # ORDER-2026-10-18-02 / -03: preferences, problems, concepts, guided intent, mesh and Blender
@@ -179,7 +181,7 @@ def test_open_and_save_stay_inside_the_cad_folders(session, tmp_path) -> None:
     inside_file.write_bytes(b"x")
     assert session.call("open_document", {"path": str(inside_file)})["ok"]
     existing = session.call("save_document", {"path": str(inside_file)})
-    assert not existing["ok"] and "never overwrite" in existing["say_to_founder"]
+    assert not existing["ok"] and existing['verification_status'] == 'TARGET UNRESOLVED'
 
 
 def test_native_open_falls_back_when_gui_loader_does_not_open(session, tmp_path, monkeypatch) -> None:
@@ -192,6 +194,27 @@ def test_native_open_falls_back_when_gui_loader_does_not_open(session, tmp_path,
     result = session.call("open_document", {"path": str(path)})
     assert result["ok"] and result["document"] == "Native"
     assert attempts == [str(path)]
+
+
+def test_verified_native_variant_uses_existing_instance_without_gui_import_dialog(session, tmp_path, monkeypatch) -> None:
+    from integrations.cadwiz_plugin import session as module
+    path = tmp_path / 'cad' / 'NativeCopy.FCStd'
+    path.write_bytes(b'native copy')
+    session.gui = SimpleNamespace(open=lambda p: pytest.fail('A verified variant must not enter the GUI import dialog route'))
+    monkeypatch.setattr(module, 'show_and_frame', lambda *args: None)
+    result = session._open_document(str(path), native_copy=True)
+    assert result['document'] == 'NativeCopy'
+
+
+def test_native_geometry_identity_tolerates_serialization_noise_but_rejects_real_changes() -> None:
+    from integrations.cadwiz_plugin.engineering_control import geometry_matches, geometry_signature
+    original = {'kind': 'Plane', 'area': 500.0, 'center': [-0.0, 0.0, 8.0], 'normal': [0.0, -0.0, 1.0]}
+    reopened = {**original, 'area': 500.0000000001, 'center': [0.0, 0.0, 8.00000000001]}
+    assert geometry_signature(original) == geometry_signature(reopened)
+    assert geometry_matches(original, reopened)
+    assert not geometry_matches(original, {**reopened, 'center': [0.0, 0.0, 8.001]})
+    assert not geometry_matches(original, {**reopened, 'normal': [0.0, 0.0, -1.0]})
+    assert not geometry_matches(original, {'kind': 'Plane'})
 
 
 def test_saving_his_file_backs_it_up_first(session, monkeypatch) -> None:
@@ -212,7 +235,7 @@ def test_export_only_through_the_tool_and_every_call_is_logged(session, tmp_path
     assert session.call("export", {"format": "stl"})["ok"]
     session.call("no_such_tool", {})
     lines = [json.loads(l) for l in (tmp_path / "calls.jsonl").read_text().splitlines()]
-    assert [l["tool"] for l in lines] == ["export", "no_such_tool"] and lines[1]["ok"] is False
+    assert [l["tool"] for l in lines] == ["document_operation", "export", "no_such_tool"] and lines[-1]["ok"] is False
 
 
 def test_nothing_open_is_a_plain_sentence(tmp_path, monkeypatch) -> None:

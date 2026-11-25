@@ -21,6 +21,7 @@ venv/
 dist/
 build/
 freecad-load-check.txt
+neil-pulley-report.json
 artifacts/
 
 # FreeCAD files and test models (keep the repo small; use tests that build their own)

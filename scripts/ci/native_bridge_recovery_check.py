@@ -88,12 +88,14 @@ def run():
         assert not server.call('edit_object',{'parameters':{'Params.Width':'46 mm'}})['ok']
         (folder/'select').touch()
         wait(lambda:json.loads((folder/'selected-window.json').read_text())['pid']==new.pid)
+        assert server.call('document_operation',{'mode':'modify'})['ok']
         edited=server.call('edit_object',{'parameters':{'Params.Width':'46 mm'}})
         assert edited.get('success') or edited.get('ok'),edited
         saved=server.call('save_document',{});assert saved.get('ok'),saved
         (folder/'stop').touch();new.wait(timeout=30);assert new.returncode==0
         reopened=launch(True)
         assert server.call('inspect_document',{})['ok']
+        assert server.call('document_operation',{'mode':'modify'})['ok']
         changed_again=server.call('edit_object',{'parameters':{'Params.Width':'47 mm'}})
         assert changed_again.get('success') or changed_again.get('ok'),changed_again
         assert server.call('save_document',{})['ok']

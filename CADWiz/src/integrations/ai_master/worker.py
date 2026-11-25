@@ -649,6 +649,15 @@ def _job_edit_existing(request, record):
                   renders=_render(doc, [o for o in objects if getattr(o, "Visibility", True)] or objects, request["render_out"], ["iso"], False) if request.get("render_out") else [])
 
 
+def _job_annular_edit(request, record):
+    from integrations.cadwiz_plugin.annular_verification import execute
+    doc, _ = _open_any(request['source_path'])
+    doc, health, evidence = execute(doc, request['intent'], request['result_path_fcstd'], worker_copy=True)
+    facts, objects = _measure(doc, request)
+    record.update(ok=True, health=health, facts=facts.to_dict(), parameters=_named_parameters(doc),
+                  dimensional_verification=evidence, renders=[])
+
+
 def _job_health(request, record):
     from integrations.ai_master.parametric_checks import verify_saved
     doc, _ = _open_any(request["source_path"])
@@ -666,7 +675,7 @@ def main() -> int:
     try:
         {"build": _job_build, "render": _job_render, "living_test": _job_living_test, "export": _job_export, "adopt": _job_adopt,
          "section": _job_section, "set_parameters": _job_set_parameters, "edit_existing": _job_edit_existing,
-         "reshape_rings": _job_reshape_rings, "health": _job_health}[request["action"]](request, record)
+         "reshape_rings": _job_reshape_rings, "health": _job_health, "annular_edit": _job_annular_edit}[request["action"]](request, record)
     except Exception as error:  # noqa: BLE001
         record.update(ok=False, error=f"{type(error).__name__}: {error}", worker_traceback=traceback.format_exc())
     record["seconds"] = round(time.perf_counter() - started, 2)

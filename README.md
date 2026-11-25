@@ -22,12 +22,13 @@ just how you talk to it. CADWiz makes no paid calls of its own.
 
 ---
 
-> ### 🧪 Early release: we need your help
+> ### Need help or have an idea?
 >
-> This is an **early, open-source beta**. It works, and it's used every day, but
-> it hasn't met many workshops yet. **The best way to help is to use it on real
-> projects and tell us what happened**: what worked, what broke, what felt
-> clumsy, and what you wish it did.
+> Press **Get help — assistant or email** on the home panel. Ask your connected
+> assistant for help, or email **support@cadwiz.app** for automatic software support.
+> Describe installation, connection or other software problems, or suggest a feature.
+> Reply to the same email thread to continue. Your CAD files are never attached
+> automatically. See [support options and service status](https://cadwiz.app/support).
 >
 > - **From inside CADWiz:** open the panel's **Setup** page, then **Help**.
 >   **Report a problem** saves a picture of FreeCAD and what just happened, and
@@ -57,8 +58,8 @@ available. See the [release notes](docs/RELEASE-NOTES-0.8.8.md).
 
 ## Status
 
-**Beta 0.9.5.** Adds model-aware gear animation and static-model turntables, a gear tooth-quality warning, and intermediate-section regression checks using native helical gears. Keeps 0.9.3 connection and installer improvements. See [0.9.5 changes](docs/RELEASE-NOTES-0.9.5.md).
-and the Free AIWiz features from 0.8.8.
+**CADWiz 1.0.** Adds visible assistant and email help while preserving the existing
+modeling, connection, installer and recovery workflows. See [1.0 changes](docs/RELEASE-NOTES-1.0.0.md).
 
 - **Works:** seeing and measuring your model; building and editing parts as
   editable FreeCAD models; pictures to choose from before anything is built;

@@ -102,15 +102,23 @@ class AdoptedExecutor(AIMasterExecutor):
         return Path(current.file) if current else (self._import_from or self.founder_file)
 
     def _ensure_backup(self) -> None:
-        if self.store.backed_up_this_session:
+        capture = getattr(self, 'capture_operation_revision', None)
+        self.operation_revision = capture() if capture else None
+        needs_snapshot = getattr(self, 'needs_live_snapshot', lambda: False)
+        if self.store.backed_up_this_session and not needs_snapshot():
             return
         measurements = key_measurements(self.adoption.get("facts"), self.adoption.get("bottom_opening"), self.adoption.get("parameters"))
         if self._import_from is not None and not self.founder_file.exists():
             self.adopt()
         self.store.backup(self._snapshot_open, measurements=measurements,
                           render=(self.adoption.get("renders") or [""])[0])
+        if capture:
+            self.operation_revision = capture()
 
     def _apply(self, result: dict[str, Any], result_file: Path, note: str) -> dict[str, Any]:
+        guard = getattr(self, 'check_operation_revision', None)
+        if guard is not None and self.operation_revision is not None:
+            guard(self.operation_revision)
         health = result.get("health") or {}
         if health and not health.get("roundtrip"):
             return {"success": False, "error": "The saved model did not survive verification; the accepted model was preserved."}
@@ -199,6 +207,21 @@ class AdoptedExecutor(AIMasterExecutor):
         if not result.get("ok"):
             return {"success": False, "error": result.get("error"), "error_line": result.get("error_line"), "health": result.get("health")}
         return self._apply(result, target, note)
+
+    def annular_edit(self, intent: dict[str, Any]) -> dict[str, Any]:
+        """Fixed native operation, independently measured before accepting its file."""
+        self._ensure_backup()
+        target = self.store.next_version_file()
+        result = self._run_worker({'action': 'annular_edit', 'source_path': str(self._latest_file()),
+                                  'intent': intent, 'result_path_fcstd': str(target),
+                                  'object_name': self.object_name, 'project_dir': str(self.project.folder),
+                                  'contract': self.project.contract().to_dict() if self.project.contract() else None})
+        if not result.get('ok'):
+            return {'success': False, 'error': result.get('error'), 'health': result.get('health') or {},
+                    'verification_status': 'ROLLED BACK'}
+        outcome = self._apply(result, target, 'Verified annular dimensional change')
+        return {**outcome, 'verification_status': 'VERIFIED SUCCESS' if outcome.get('success') else 'ROLLED BACK',
+                'dimensional_verification': result.get('dimensional_verification')}
 
     #: Rebuilding a lofted body from its rings takes about two minutes on the
     #: founder's helmet (measured 2026-10-12); the job gets five.

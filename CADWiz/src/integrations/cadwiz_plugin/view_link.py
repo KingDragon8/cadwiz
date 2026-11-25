@@ -557,6 +557,15 @@ def selection(gui: Any) -> list[dict[str, Any]]:
             picked.append({"document": str(item.DocumentName), "object": str(item.ObjectName), "label": str(getattr(obj, "Label", "")),
                            "type": str(getattr(obj, "TypeId", "")), "elements": [str(s) for s in item.SubElementNames],
                            "picked_points_mm": [[round(p.x, 3), round(p.y, 3), round(p.z, 3)] for p in item.PickedPoints]})
+            picked[-1]['geometry_references'] = []
+            picked[-1]['resolution'] = 'VISUAL OR OBJECT SELECTION ONLY'
+            for element in item.SubElementNames:
+                try:
+                    from integrations.cadwiz_plugin.engineering_control import geometry_reference
+                    picked[-1]['geometry_references'].append(geometry_reference(obj.Document, obj, str(element)))
+                    picked[-1]['resolution'] = 'GEOMETRY RESOLVED'
+                except (AttributeError, ValueError, RuntimeError):
+                    picked[-1]['resolution'] = 'TARGET UNRESOLVED'
     return picked
 
 

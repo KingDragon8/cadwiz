@@ -545,6 +545,17 @@ class _Panel:
         column.setSpacing(8)
         column.addWidget(self._build_header())
         column.addWidget(self._build_page_bar())
+        help_button = QtWidgets.QPushButton("Need help? Ask your assistant or email CADWiz", self.full)
+        help_button.setObjectName("CADWiz_Support_Help")
+        help_button.setToolTip("Get help with a problem or question. No special phrase to remember.")
+        from integrations.cadwiz_plugin.support_help import show_help
+        help_button.clicked.connect(lambda _checked=False: show_help(self))
+        column.addWidget(help_button)
+        working_button = QtWidgets.QPushButton('Working file — create a variant or edit this document', self.full)
+        working_button.setObjectName('CADWiz_Working_File')
+        from integrations.cadwiz_plugin.document_actions import choose_working_file
+        working_button.clicked.connect(lambda _checked=False: choose_working_file(self))
+        column.addWidget(working_button)
         from integrations.cadwiz_plugin.panel_pages import PrintingPage, SetupPage
 
         self.pages = QtWidgets.QStackedWidget(self.full)
@@ -1576,12 +1587,13 @@ class _Panel:
         image.save(str(marked))
         store = self._store()
         latest = store.latest() if store is not None else 0
+        from integrations.cadwiz_plugin.engineering_control import mark_geometry
         screen.freeze(picture=str(marked), clean_picture=str(clean), camera=camera, aspect=aspect, selection=view_link.selection(gui),
                       view=("cut-away, " if view_link.is_cut_away(view) else "")
                       + ("parts pulled apart (Assembly), " if view_link.is_exploded(document) else "") + view_link.view_name(camera),
                       cut_away=view_link.is_cut_away(view),
                       document=str(document.Label), file=str(getattr(document, "FileName", "") or ""), version=latest, latest_version=latest,
-                      broken=view_link.broken_objects(document), request=request)
+                      broken=view_link.broken_objects(document), request=request, geometry_references=mark_geometry(document, self.marks()))
         self.seen_read = None
         self.flash(FROZEN, FOUNDER_BLUE, seconds=4.0)
 
@@ -1775,6 +1787,13 @@ class _Panel:
         same_file = session is not None and document is not None and str(getattr(document, "FileName", "")) == session.state.get("file")
         level = str(session.state.get("editability", "")) if same_file else ""
         text = "Last editability check: " + (level or "not verified — use Setup → Check model health")
+        if session is not None and session.document_authority is not None:
+            authority = session.document_authority
+            text += '\nWorking file: ' + Path(authority.target_path).name
+            if authority.source_path:
+                text += ' · Source protected: ' + Path(authority.source_path).name
+        if session is not None and session.state.get('verification_status'):
+            text += '\n' + session.state['verification_status']
         if level and bool(getattr(document, "Modified", False)):
             text += " · Unsaved changes: recheck model health."
         self.editability_label.setText(text)

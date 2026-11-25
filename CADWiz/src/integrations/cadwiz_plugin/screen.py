@@ -81,7 +81,8 @@ class ScreenState:
     # ---- Show Claude ----------------------------------------------------------------
     def freeze(self, *, picture: str, clean_picture: str, camera: Camera | None, aspect: float, selection: list[dict[str, Any]],
                view: str, cut_away: bool, document: str, file: str, version: int, latest_version: int,
-               broken: list[str] | None = None, request: dict[str, Any] | None = None) -> dict[str, Any]:
+               broken: list[str] | None = None, request: dict[str, Any] | None = None,
+               geometry_references: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Freeze what is on the screen now as 'what I'm showing Claude'."""
         self.frames += 1
         marks = list(self.book.marks)
@@ -104,6 +105,7 @@ class ScreenState:
             "marks_in_words": describe_marks(marks),
             "founder_mark_count": len(founder),
             "selection": selection,
+            "geometry_references": geometry_references or [],
             "pictures": [p for p in (picture, clean_picture) if p],
             "how_to_read": HOW_TO_READ,
         }

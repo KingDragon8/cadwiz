@@ -19,17 +19,23 @@ from pathlib import Path
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source-tree", help="Immutable staged Git tree for an unpublished OASIS candidate; defaults to committed HEAD")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
+    source = args.source_tree or "HEAD"
+    if args.source_tree:
+        import re
+        assert re.fullmatch(r"[a-f0-9]{40}", source), "A full immutable Git tree hash is required"
+        assert subprocess.check_output(["git", "cat-file", "-t", source], cwd=root).strip() == b"tree"
     version = tomllib.loads(subprocess.check_output(
-        ["git", "show", "HEAD:pyproject.toml"], cwd=root).decode("utf-8"))["project"]["version"]
+        ["git", "show", source + ":pyproject.toml"], cwd=root).decode("utf-8"))["project"]["version"]
     args.output.mkdir(parents=True, exist_ok=True)
     archive = args.output / f"cadwiz-{version}.zip"
     if archive.exists():
         raise SystemExit(f"Refusing to overwrite {archive}")
     prefix = f"cadwiz-{version}/"
     subprocess.run(["git", "archive", "--format=zip", f"--prefix={prefix}",
-                    f"--output={archive.resolve()}", "HEAD"], cwd=root, check=True)
+                    f"--output={archive.resolve()}", source], cwd=root, check=True)
     with zipfile.ZipFile(archive) as package:
         assert package.testzip() is None, "Corrupt ZIP"
         names = package.namelist()
