@@ -47,11 +47,11 @@ the assistant interpreted a requested dimension correctly. Unresolved targets,
 unsupported operations, failed verification and rollback have separate statuses.
 The same unsuccessful annular intent on an unchanged revision is not run again.
 
-To repeat Neil's acceptance workflow, keep Variant B active, select Variant A as
+To repeat the customer's acceptance workflow, keep Variant B active, select Variant A as
 the exact source, create a separate variant, point to the annular groove, and
 request an inward 0.8 mm radial widening. Require an inner radius delta of
 −0.800 mm, outer radius delta of 0.000 mm, unchanged source and shaft opening,
 preserved curvature/history and successful native save/reopen checks. Request
 any mating-ridge clearance or depth change separately and inspect the assembled
 clearance. The permanent native suite uses representative fixtures; it does not
-claim to test Neil's original files when those files are unavailable.
+claim to test the customer's original files when those files are unavailable.

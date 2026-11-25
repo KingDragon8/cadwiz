@@ -7,7 +7,7 @@
 - Native Point/Highlight geometry references distinguish resolved features from visual annotations and detect stale selections.
 - Supported annular Pocket/Pad changes independently verify direction, actual dimensions, curvature, unrelated geometry and native save/reopen results.
 - Headless transaction rollback enables FreeCAD undo explicitly; failed edits cannot leave an old verified-success status visible.
-- Representative pulley regression fixtures cover the reported incident categories, without claiming to be Neil's unavailable original files.
+- Representative pulley regression fixtures cover the reported incident categories, without claiming to be the customer's unavailable original files.
 - Support accepts software questions and feature requests without automatically attaching CAD files.
 - Release tooling can package the exact immutable source tree validated by the private OASIS pipeline.
 

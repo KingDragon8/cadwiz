@@ -9,7 +9,7 @@ import shutil
 
 def check(app, gui, folder, panel):
     assert os.environ.get('CI') == 'true', 'Disposable CI desktop only'
-    from native_neil_pulley_check import pulley, intent
+    from native_pulley_controls_check import pulley, intent
     from integrations.cadwiz_plugin import view_link
     from integrations.cadwiz_plugin.engineering_control import mark_geometry, file_hash
     from ai_freecad_core.visual_communications.anchored import AnchoredMark

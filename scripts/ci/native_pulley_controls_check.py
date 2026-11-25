@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
-"""CADWIZ-NEIL-PULLEY-001: representative native geometry, never Neil's files.
+"""CADWIZ-PULLEY-CONTROLS-001: representative native geometry, never the customer's files.
 
 Run with FreeCAD's Python on disposable CI/headless workers. No GUI is started.
 Pointer/highlight pixel picking is separately required; these tests prove the
@@ -40,7 +40,7 @@ from integrations.cadwiz_plugin.annular_verification import execute, prepare, ve
 from integrations.cadwiz_plugin.session import PluginSession  # noqa: E402
 
 QT = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-REPORT = {'suite': 'CADWIZ-NEIL-PULLEY-001', 'fixture': 'representative; Neil original pulley files unavailable',
+REPORT = {'suite': 'CADWIZ-PULLEY-CONTROLS-001', 'fixture': 'representative; Customer original pulley files unavailable',
           'visual_pointer_picking': 'not tested by headless suite', 'cases': []}
 
 
@@ -81,7 +81,7 @@ def intent(doc, **updates):
 
 class Cases(unittest.TestCase):
     def setUp(self):
-        self.folder = tempfile.TemporaryDirectory(prefix='cadwiz-neil-')
+        self.folder = tempfile.TemporaryDirectory(prefix='cadwiz-pulley-')
         self.root = Path(self.folder.name)
         self.a = pulley('Variant_A', self.root/'Variant_A.FCStd')
         self.b = pulley('Variant_B', self.root/'Variant_B.FCStd')
@@ -348,5 +348,5 @@ if __name__ == '__main__':
         def addFailure(self,test,error):REPORT['cases'].append({'case':test._testMethodName,'status':'FAIL'});super().addFailure(test,error)
         def addError(self,test,error):REPORT['cases'].append({'case':test._testMethodName,'status':'ERROR'});super().addError(test,error)
     result=unittest.TextTestRunner(verbosity=2,resultclass=Result).run(unittest.defaultTestLoader.loadTestsFromTestCase(Cases))
-    Path('neil-pulley-report.json').write_text(json.dumps(REPORT,indent=2))
+    Path('pulley-controls-report.json').write_text(json.dumps(REPORT,indent=2))
     raise SystemExit(0 if result.wasSuccessful() else 1)

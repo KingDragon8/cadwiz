@@ -38,8 +38,8 @@ jobs:
         run: python3 scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output mac-acceptance
       - name: Native bridge restart and safe parametric recovery
         run: '"$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" scripts/ci/native_bridge_recovery_check.py'
-      - name: Native Neil pulley document and dimensional controls
-        run: '"$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" scripts/ci/native_neil_pulley_check.py'
+      - name: Native pulley document and dimensional controls
+        run: '"$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" scripts/ci/native_pulley_controls_check.py'
       - name: Repeat on case-sensitive APFS
         shell: bash
         run: |
@@ -87,7 +87,7 @@ jobs:
       - name: Repeat on case-sensitive APFS
         shell: bash
         run: |
-          "$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" scripts/ci/native_neil_pulley_check.py
+          "$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" scripts/ci/native_pulley_controls_check.py
           hdiutil create -size 1g -fs 'Case-sensitive APFS' -volname CADWizCaseQA -type SPARSE -o "$RUNNER_TEMP/cadwiz-case.sparseimage"
           mkdir -p "$RUNNER_TEMP/cadwiz-case-volume"
           hdiutil attach "$RUNNER_TEMP/cadwiz-case.sparseimage" -nobrowse -mountpoint "$RUNNER_TEMP/cadwiz-case-volume"

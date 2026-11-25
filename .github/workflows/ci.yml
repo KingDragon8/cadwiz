@@ -111,8 +111,8 @@ jobs:
             native-motion-report.json
       - name: Production session and sandbox acceptance
         run: squashfs-root/usr/bin/freecadcmd scripts/ci/native_session_check.py
-      - name: Native Neil pulley document and dimensional controls
-        run: squashfs-root/usr/bin/python scripts/ci/native_neil_pulley_check.py
+      - name: Native pulley document and dimensional controls
+        run: squashfs-root/usr/bin/python scripts/ci/native_pulley_controls_check.py
       - name: Native bridge restart and safe parametric recovery
         run: squashfs-root/usr/bin/freecadcmd scripts/ci/native_bridge_recovery_check.py
 
@@ -159,8 +159,8 @@ jobs:
             python -c "import xml.etree.ElementTree as E; r=E.parse('windows-shell.xml'); assert all(int(s.get(k,'0'))==0 for s in r.iter('testsuite') for k in ('skipped','failures','errors')), 'Windows shell tests skipped or failed'"
       - name: Native Windows parametric checks
         run: |
-          & "$env:CADWIZ_TEST_FREECAD_BIN\python.exe" scripts/ci/native_neil_pulley_check.py
-          if ($LASTEXITCODE -ne 0) { throw 'Native Neil pulley controls failed' }
+          & "$env:CADWIZ_TEST_FREECAD_BIN\python.exe" scripts/ci/native_pulley_controls_check.py
+          if ($LASTEXITCODE -ne 0) { throw 'Native pulley controls failed' }
           & "$env:CADWIZ_TEST_FREECAD_BIN\python.exe" scripts/ci/native_parametric_check.py
           if ($LASTEXITCODE -ne 0) { throw 'Native parametric check failed' }
           & "$env:CADWIZ_TEST_FREECAD_BIN\python.exe" scripts/ci/native_session_check.py

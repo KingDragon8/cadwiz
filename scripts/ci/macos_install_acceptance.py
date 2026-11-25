@@ -2,7 +2,7 @@
 """Real macOS CI runner acceptance. Never run against an owner's profile.
 
 This starts isolated, disposable FreeCAD GUIs on a CI desktop only. It does not
-claim to be Neil's Mac or verify interactive assistant account enrollment.
+claim to be the customer's Mac or verify interactive assistant account enrollment.
 """
 import argparse
 import json
@@ -106,9 +106,9 @@ def finish():
         result['working_file_button_visible'] = bool(working and working.isVisible())
         if RUN_NEIL_GUI:
             import sys
-            sys.path.insert(0, NEIL_SCRIPTS)
-            from native_neil_gui_check import check
-            result['neil_native_gui'] = check(FreeCAD, FreeCADGui, NEIL_OUTPUT, panel)
+            sys.path.insert(0, PULLEY_SCRIPTS)
+            from native_pulley_gui_check import check
+            result['pulley_native_gui'] = check(FreeCAD, FreeCADGui, PULLEY_OUTPUT, panel)
     except Exception:
         result['error'] = traceback.format_exc()
     finally:
@@ -117,12 +117,12 @@ def finish():
             # Only disposable test documents; avoid an unsaved-file close prompt
             # hiding a recorded assertion failure behind the outer timeout.
             for document in list(FreeCAD.listDocuments().values()):
-                if document.FileName and Path(document.FileName).resolve().is_relative_to(Path(NEIL_OUTPUT).resolve()):
+                if document.FileName and Path(document.FileName).resolve().is_relative_to(Path(PULLEY_OUTPUT).resolve()):
                     FreeCAD.closeDocument(document.Name)
         window.close()
 QtCore.QTimer.singleShot(12000, finish)
 '''.replace('RESULT', repr(str(result_file))).replace('RUN_NEIL_GUI', repr(label == 'clean-install'))
-   .replace('NEIL_SCRIPTS', repr(str(repo/'scripts/ci'))).replace('NEIL_OUTPUT', repr(str(out/'neil-gui'))))
+   .replace('PULLEY_SCRIPTS', repr(str(repo/'scripts/ci'))).replace('PULLEY_OUTPUT', repr(str(out/'pulley-gui'))))
         command = [gui, macro]
         if offline:
             command = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)', *command]
@@ -131,8 +131,8 @@ QtCore.QTimer.singleShot(12000, finish)
         if label == 'clean-install' and record.get('error'):
             # Capture the actual headless snapshot descriptors, without changing
             # the fixture or concealing the original GUI assertion failure.
-            fixture=out/'neil-gui'/'WorkerSnapshot.FCStd'
-            if not fixture.is_file():fixture=out/'neil-gui'/'Working.FCStd'
+            fixture=out/'pulley-gui'/'WorkerSnapshot.FCStd'
+            if not fixture.is_file():fixture=out/'pulley-gui'/'Working.FCStd'
             if fixture.is_file():
                 probe=subprocess.run([str(python),str(repo/'scripts/ci/native_reference_probe.py'),str(fixture),str(fixture.parent/'worker-reference.json')],
                                      env=env,capture_output=True,text=True,timeout=30)
@@ -140,7 +140,7 @@ QtCore.QTimer.singleShot(12000, finish)
         assert record['workbench_registered'] and record['panel_visible'], record
         assert record['support_button_visible'] and record['working_file_button_visible'], record
         if label == 'clean-install':
-            assert record.get('neil_native_gui', {}).get('status') == 'PASS', record
+            assert record.get('pulley_native_gui', {}).get('status') == 'PASS', record
         assert record['cadwiz_version'] == '1.0.0', record
         assert record['communication_title'] == 'Wiz communication screen' and record['guidance_present'], record
         assert record['aiwiz_tabs'] == ['AI Wiz Setup', 'AI Wiz Management'], record
@@ -181,7 +181,7 @@ QtCore.QTimer.singleShot(12000, finish)
     (mod/'cadwiz/.git').mkdir()
     shutil.copytree(qa/'old/CADWiz', mod/'cadwiz.backup.interrupted')
     install()
-    startup('neil-nested-recovery')
+    startup('customer-nested-recovery')
     # Optional setup failures are forced in the installed code in this QA profile.
     setup = mod/'CADWiz/src/integrations/cadwiz_plugin/setup_startup.py'
     setup_source = setup.read_text()
@@ -195,7 +195,7 @@ QtCore.QTimer.singleShot(12000, finish)
              'else:\n raise AssertionError("network sandbox did not deny access")\n')
     run(['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)', python, '-c', proof])
     startup('network-denied-startup', offline=True)
-    results.append({'test': 'Neil physical Mac and interactive assistant connection', 'status': 'NOT VERIFIED'})
+    results.append({'test': 'Customer physical Mac and interactive assistant connection', 'status': 'NOT VERIFIED'})
     save_results()
 
 
