@@ -77,14 +77,20 @@ def main():
     assert Path(reopened.FileName).samefile(b_path) and float(reopened.Solid.Length)==20
     reopened.Solid.Length=21;reopened.recompute()
     copied=folder/'LiveSnapshot.FCStd'
-    session._snapshot(old_name,str(b_path),str(copied))
+    # Native reload may reuse the old Name. A guaranteed absent handle must
+    # exercise the live-file fallback rather than accidentally use direct lookup.
+    stale_name=old_name
+    while stale_name in app.listDocuments():stale_name+='_BeforeReload'
+    assert stale_name not in app.listDocuments()
+    session._snapshot(stale_name,str(b_path),str(copied))
     snapshot=app.openDocument(str(copied))
     assert float(snapshot.Solid.Length)==21
     assert original==[sha(a_path),sha(b_path)] and record.read_bytes()==history
     report={'status':'PASS','fixture':'anonymous native boxes on actual case-sensitive filesystem',
             'wrong_unsaved_document_preserved':True,'cached_executor_collision_refused':True,
             'persisted_history_collision_refused':True,'renamed_live_snapshot_preserved':True,
-            'founder_files_and_existing_history_unchanged':True}
+            'founder_files_and_existing_history_unchanged':True,
+            'snapshot_lookup':'Guaranteed absent stale handle; native name reuse is allowed'}
     args.output.write_text(json.dumps(report,indent=2))
     for name in list(app.listDocuments()):app.closeDocument(name)
     print(json.dumps(report))
