@@ -9,7 +9,7 @@ import sys
 
 def compare_paint(visible, background, hits, misses, width, height):
     assert visible.size() == background.size(), 'Capture dimensions changed'
-    assert len(hits) >= 5 and len(misses) >= 5, 'Insufficient geometry/background samples'
+    assert len(hits) >= 5 and len(misses) >= 5, ('Insufficient geometry/background samples',len(hits),len(misses))
     def changed(point):
         x = min(visible.width()-1, int(point[0]*visible.width()/width))
         y = min(visible.height()-1, int((height-1-point[1])*visible.height()/height))
@@ -65,12 +65,6 @@ def verify(app, gui, authority, folder):
                                                    for other in candidates)]
     assert len(candidates)==1, ('Ambiguous native render widget',details)
     widget = candidates[0]
-    hits=[];misses=[]
-    for x in range(1,25):
-        for y in range(1,25):
-            point=(int(width*x/25),int(height*y/25))
-            info=view.getObjectInfo(point)
-            (hits if info else misses).append(point)
     visible_shapes = [obj for obj in document.Objects if hasattr(obj,'Shape')
                       and obj.ViewObject.Visibility and not obj.Shape.isNull()]
     assert visible_shapes, 'Bound target has no visible native shapes'
@@ -81,6 +75,15 @@ def verify(app, gui, authority, folder):
         gui.updateGui()
     refresh()
     visible,rectangle = capture_region(widget,Path(folder,'native-viewport-visible.png'))
+    # Sample only after the new native view has rendered and the OS compositor
+    # has presented that frame. Pre-redraw picking can still use an old matrix.
+    width,height=view.getSize()
+    hits=[];misses=[]
+    for x in range(1,25):
+        for y in range(1,25):
+            point=(int(width*x/25),int(height*y/25))
+            info=view.getObjectInfo(point)
+            (hits if info else misses).append(point)
     try:
         for obj in visible_shapes:obj.ViewObject.Visibility=False
         refresh()
@@ -89,9 +92,13 @@ def verify(app, gui, authority, folder):
         for obj in visible_shapes:obj.ViewObject.Visibility=True
         refresh()
     restored,_ = capture_region(widget,Path(folder,'native-viewport-verified.png'))
+    Path(folder,'native-capture-samples.json').write_text(json.dumps({
+        'hits':hits,'misses':misses,'width':width,'height':height,
+        'capture_rectangle':rectangle,'image_size':[visible.width(),visible.height()],
+    },indent=2))
+    capture_region(gui.getMainWindow(),Path(folder,'pointer-edit-verified.png'))
     result=compare_paint(visible,background,hits,misses,width,height)
     compare_paint(restored,background,hits,misses,width,height)
-    capture_region(gui.getMainWindow(),Path(folder,'pointer-edit-verified.png'))
     return {**result,'width':width,'height':height,'document':document.Name,
             'working_file':str(target),'gui_pid':os.getpid(),'os_capture_rect':rectangle,
             'capture':'macOS OS-composited visible/background/restored viewport'}
