@@ -40,7 +40,7 @@ def capture_region(widget, output):
 def verify(app, gui, authority, folder):
     assert os.environ.get('CI') == 'true' and sys.platform == 'darwin'
     from PySide import QtWidgets, QtCore
-    from integrations.cadwiz_plugin.view_link import active_view
+    from integrations.cadwiz_plugin.view_link import active_view, read_camera, ray_hit
     target = Path(authority.target_path).resolve()
     document = app.ActiveDocument
     assert Path(document.FileName).resolve() == target, 'Wrong active native document'
@@ -67,7 +67,9 @@ def verify(app, gui, authority, folder):
     widget = candidates[0]
     visible_shapes = [obj for obj in document.Objects if hasattr(obj,'Shape')
                       and obj.ViewObject.Visibility and not obj.Shape.isNull()]
-    assert visible_shapes, 'Bound target has no visible native shapes'
+    visible_shapes = [obj for obj in visible_shapes
+                      if getattr(obj,'getParentGeoFeatureGroup',lambda:None)() not in visible_shapes]
+    assert visible_shapes, 'Bound target has no visible native final shapes'
     def refresh():
         gui.updateGui();view.redraw()
         loop=QtCore.QEventLoop();QtCore.QTimer.singleShot(200,loop.quit)
@@ -78,23 +80,29 @@ def verify(app, gui, authority, folder):
     # Sample only after the new native view has rendered and the OS compositor
     # has presented that frame. Pre-redraw picking can still use an old matrix.
     width,height=view.getSize()
+    camera=read_camera(view)
+    assert camera is not None
+    camera_state=view.getCamera()
     hits=[];misses=[]
     for x in range(1,25):
         for y in range(1,25):
             point=(int(width*x/25),int(height*y/25))
-            info=view.getObjectInfo(point)
-            (hits if info else misses).append(point)
+            hit=ray_hit(camera,point[0]/width,1-point[1]/height,width/height,visible_shapes)
+            (hits if hit is not None else misses).append(point)
     try:
         for obj in visible_shapes:obj.ViewObject.Visibility=False
         refresh()
-        background,_ = capture_region(widget,Path(folder,'native-viewport-background.png'))
+        background,background_rectangle = capture_region(widget,Path(folder,'native-viewport-background.png'))
+        assert background_rectangle == rectangle and view.getCamera() == camera_state
     finally:
         for obj in visible_shapes:obj.ViewObject.Visibility=True
         refresh()
-    restored,_ = capture_region(widget,Path(folder,'native-viewport-verified.png'))
+    restored,restored_rectangle = capture_region(widget,Path(folder,'native-viewport-verified.png'))
+    assert restored_rectangle == rectangle and view.getCamera() == camera_state
     Path(folder,'native-capture-samples.json').write_text(json.dumps({
         'hits':hits,'misses':misses,'width':width,'height':height,
         'capture_rectangle':rectangle,'image_size':[visible.width(),visible.height()],
+        'camera':camera.to_dict(),'geometry_classifier':'production BRep ray_hit',
     },indent=2))
     capture_region(gui.getMainWindow(),Path(folder,'pointer-edit-verified.png'))
     result=compare_paint(visible,background,hits,misses,width,height)
