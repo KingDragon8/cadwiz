@@ -539,20 +539,27 @@ class _Panel:
         outer.setSpacing(0)
         self.full = QtWidgets.QWidget(content)
         self.full.setObjectName("CADWiz_Full")
-        outer.addWidget(self.full, 1)
+        # Scroll tall dock content instead of forcing FreeCAD below the desktop.
+        self.full_scroll = QtWidgets.QScrollArea(content)
+        self.full_scroll.setObjectName("CADWiz_Full_Scroll")
+        self.full_scroll.setWidgetResizable(True)
+        self.full_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.full_scroll.setWidget(self.full)
+        outer.addWidget(self.full_scroll, 1)
         column = QtWidgets.QVBoxLayout(self.full)
         column.setContentsMargins(14, 10, 14, 10)
         column.setSpacing(8)
         column.addWidget(self._build_header())
         column.addWidget(self._build_page_bar())
-        help_button = QtWidgets.QPushButton("Need help? Ask your assistant or email CADWiz", self.full)
+        help_button = QtWidgets.QPushButton("Help: ask your assistant or email CADWiz", self.full)
         help_button.setObjectName("CADWiz_Support_Help")
         help_button.setToolTip("Get help with a problem or question. No special phrase to remember.")
         from integrations.cadwiz_plugin.support_help import show_help
         help_button.clicked.connect(lambda _checked=False: show_help(self))
         column.addWidget(help_button)
-        working_button = QtWidgets.QPushButton('Working file — create a variant or edit this document', self.full)
+        working_button = QtWidgets.QPushButton('Working file: create a variant or edit', self.full)
         working_button.setObjectName('CADWiz_Working_File')
+        working_button.setToolTip('Choose an exact source and separate working variant, or explicitly edit this document.')
         from integrations.cadwiz_plugin.document_actions import choose_working_file
         working_button.clicked.connect(lambda _checked=False: choose_working_file(self))
         column.addWidget(working_button)
@@ -668,9 +675,12 @@ class _Panel:
         QtCore, QtWidgets = self.QtCore, self.QtWidgets
         header = QtWidgets.QFrame(self.full)
         header.setObjectName("CADWiz_Header")
-        row = QtWidgets.QHBoxLayout(header)
-        row.setContentsMargins(0, 0, 0, 0)
+        header_column = QtWidgets.QVBoxLayout(header)
+        header_column.setContentsMargins(0, 0, 0, 0)
+        header_column.setSpacing(6)
+        row = QtWidgets.QHBoxLayout()
         row.setSpacing(10)
+        header_column.addLayout(row)
         self.wiz = QtWidgets.QLabel(header)
         self.wiz.setObjectName("CADWiz_Wiz")
         # Smaller than it was (64 px, 34 px type) so the picture gets the room (ORDER-2026-10-19-05).
@@ -728,7 +738,8 @@ class _Panel:
         setup_actions.addWidget(self.manual_connection_button)
         setup_actions.addStretch(1)
         info.addLayout(setup_actions)
-        row.addLayout(info, 1)
+        row.addStretch(1)
+        header_column.addLayout(info)
         return header
 
     def _build_page_bar(self) -> Any:
@@ -1225,6 +1236,7 @@ class _Panel:
         return strip
 
     def show_collapsed(self, collapsed: bool) -> None:
+        self.full_scroll.setVisible(not collapsed)
         self.full.setVisible(not collapsed)
         self.strip.setVisible(collapsed)
         self.collapse_button.setText("Collapse")

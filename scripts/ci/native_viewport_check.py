@@ -32,6 +32,8 @@ def capture_region(widget, output):
                    check=True,capture_output=True,timeout=15)
     image = QtGui.QImage(str(output))
     assert not image.isNull() and image.width()>0 and image.height()>0, 'OS capture unavailable'
+    scale_x=image.width()/rectangle[2];scale_y=image.height()/rectangle[3]
+    assert abs(scale_x-scale_y)<.03, ('OS viewport capture clipped by desktop',rectangle,image.width(),image.height())
     return image, rectangle
 
 

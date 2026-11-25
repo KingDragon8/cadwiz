@@ -31,6 +31,12 @@ def check(app, gui, folder, panel):
     hashes=[file_hash(a.FileName),file_hash(b.FileName)]
     app.setActiveDocument(b.Name)
     assert panel is not None, 'The actual CADWiz panel must be present'
+    panel.host.collapse();gui.updateGui()
+    assert panel.strip.isVisible() and not panel.full_scroll.isVisible()
+    panel.host.expand();gui.updateGui()
+    assert panel.full.isVisible() and panel.full_scroll.isVisible()
+    window=gui.getMainWindow()
+    assert window.screen().availableGeometry().contains(window.frameGeometry()), 'FreeCAD window must fit the desktop'
     session=panel.session()
     assert session is not None and session.document_authority is None
     real_factory=session._factory

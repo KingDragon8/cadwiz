@@ -76,6 +76,8 @@ import FreeCAD, FreeCADGui, traceback
 from PySide import QtCore, QtWidgets
 def finish():
     window = FreeCADGui.getMainWindow()
+    window.showMaximized()
+    FreeCADGui.updateGui()
     result = {}
     try:
         found = 'CADWizWorkbench' in FreeCADGui.listWorkbenches()

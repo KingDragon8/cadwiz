@@ -83,7 +83,7 @@ class PanelHost:
         self.auto_collapsed = False
         self.width_before = int(self.settings.get("docked_width") or 0)
         self.window = dock.parent()
-        panel.full.setMinimumWidth(FULL_MIN_WIDTH)
+        getattr(panel, "full_scroll", panel.full).setMinimumWidth(FULL_MIN_WIDTH)
         dock.setFeatures(dock.features() | self.QtWidgets.QDockWidget.DockWidgetFloatable | self.QtWidgets.QDockWidget.DockWidgetMovable
                          | self.QtWidgets.QDockWidget.DockWidgetClosable)
         dock.topLevelChanged.connect(self._top_level_changed)
@@ -203,6 +203,15 @@ class PanelHost:
                 return False
             squeezed = mdi.width() < CAD_MIN_WIDTH or mdi.height() < CAD_MIN_HEIGHT
             changed = False
+            with contextlib.suppress(Exception):
+                available = self.window.screen().availableGeometry()
+                frame = self.window.frameGeometry()
+                if frame.height() > available.height():
+                    decorations = max(0, frame.height() - self.window.height())
+                    self.window.resize(self.window.width(), available.height() - decorations)
+                    self.window.move(self.window.x(), available.y())
+                    squeezed = True
+                    changed = True
             if not self.dock.isFloating() and not self.collapsed:
                 area = self.window.dockWidgetArea(self.dock)
                 if area in (self.QtCore.Qt.TopDockWidgetArea, self.QtCore.Qt.BottomDockWidgetArea) and squeezed:
@@ -287,7 +296,7 @@ class PanelHost:
         if not self.dock.isFloating() and self.dock.width() > STRIP_WIDTH + 20:
             self.width_before = int(self.dock.width())
         self.collapsed, self.auto_collapsed = True, auto
-        self.panel.full.setMinimumWidth(0)
+        getattr(self.panel, "full_scroll", self.panel.full).setMinimumWidth(0)
         self.panel.show_collapsed(True)
         self.dock.setMaximumWidth(STRIP_WIDTH + 16)
         if self.dock.isFloating():
@@ -313,7 +322,7 @@ class PanelHost:
             self.dock.resize(int(geometry[2]), self.dock.height())
         else:
             self._resize_docked(self.width_before or 860)
-        self.panel.full.setMinimumWidth(FULL_MIN_WIDTH)
+        getattr(self.panel, "full_scroll", self.panel.full).setMinimumWidth(FULL_MIN_WIDTH)
         self.panel.show_collapsed(False)
         self.dock.show()
         if not self.dock.isFloating():
