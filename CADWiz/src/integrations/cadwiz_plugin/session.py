@@ -1517,7 +1517,15 @@ def show_and_frame(gui: Any, document: Any, shown: set[str]) -> None:
     with contextlib.suppress(Exception):
         view.viewIsometric()
     with contextlib.suppress(Exception):
+        # A document reload replaces its native view. Flush MDI activation before
+        # fitting, then paint that new view before capturing or returning it.
+        gui.updateGui()
+    with contextlib.suppress(Exception):
         view.fitAll()
+    with contextlib.suppress(Exception):
+        view.redraw()
+    with contextlib.suppress(Exception):
+        gui.updateGui()
 
 
 def inches_first_words(mm: float) -> str:
