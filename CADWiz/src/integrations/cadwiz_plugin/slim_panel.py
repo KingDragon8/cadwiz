@@ -539,10 +539,13 @@ class _Panel:
         outer.setSpacing(0)
         self.full = QtWidgets.QWidget(content)
         self.full.setObjectName("CADWiz_Full")
+        self.full.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+        self.full.setMinimumWidth(0)
         # Scroll tall dock content instead of forcing FreeCAD below the desktop.
         self.full_scroll = QtWidgets.QScrollArea(content)
         self.full_scroll.setObjectName("CADWiz_Full_Scroll")
         self.full_scroll.setWidgetResizable(True)
+        self.full_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.full_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.full_scroll.setWidget(self.full)
         outer.addWidget(self.full_scroll, 1)
@@ -550,13 +553,13 @@ class _Panel:
         column.setContentsMargins(14, 10, 14, 10)
         column.setSpacing(8)
         column.addWidget(self._build_header())
-        column.addWidget(self._build_page_bar())
         help_button = QtWidgets.QPushButton("Help: ask your assistant or email CADWiz", self.full)
         help_button.setObjectName("CADWiz_Support_Help")
         help_button.setToolTip("Get help with a problem or question. No special phrase to remember.")
         from integrations.cadwiz_plugin.support_help import show_help
         help_button.clicked.connect(lambda _checked=False: show_help(self))
         column.addWidget(help_button)
+        column.addWidget(self._build_page_bar())
         working_button = QtWidgets.QPushButton('Working file: create a variant or edit', self.full)
         working_button.setObjectName('CADWiz_Working_File')
         working_button.setToolTip('Choose an exact source and separate working variant, or explicitly edit this document.')
@@ -712,7 +715,9 @@ class _Panel:
 
         # One row: the light(s) and the Claude/ChatGPT choice, so the header never grows (ORDER-2026-10-19-02).
         self.ai_choice = AiChoice(self, header)
-        self.ai_choice.row.insertWidget(0, self.light)
+        info.addWidget(self.light)
+        self.ai_choice.row.removeWidget(self.ai_choice.second)
+        info.addWidget(self.ai_choice.second)
         # Connect (ORDER-2026-10-20-01): shown while the light is not green; opens the
         # Claude app if it is closed and says plainly what happened.
         self.connect_button = QtWidgets.QPushButton("Connect", header)

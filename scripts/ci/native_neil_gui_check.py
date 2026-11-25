@@ -35,6 +35,12 @@ def check(app, gui, folder, panel):
     assert panel.strip.isVisible() and not panel.full_scroll.isVisible()
     panel.host.expand();gui.updateGui()
     assert panel.full.isVisible() and panel.full_scroll.isVisible()
+    assert panel.full.width() <= panel.full_scroll.viewport().width(), 'Panel content exceeds its viewport'
+    assert panel.full_scroll.horizontalScrollBar().maximum() == 0, 'No horizontal scrolling should be necessary'
+    help_button = panel.full.findChild(panel.QtWidgets.QPushButton, 'CADWiz_Support_Help')
+    help_rect = help_button.rect()
+    help_top = help_button.mapTo(panel.full_scroll.viewport(),help_rect.topLeft())
+    assert panel.full_scroll.viewport().rect().contains(help_top), 'Help must be visible on the home panel'
     window=gui.getMainWindow()
     assert window.screen().availableGeometry().contains(window.frameGeometry()), 'FreeCAD window must fit the desktop'
     session=panel.session()

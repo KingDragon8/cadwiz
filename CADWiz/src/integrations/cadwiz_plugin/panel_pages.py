@@ -94,15 +94,19 @@ class AiChoice:
         self.second.setProperty("role", "light")
         self.second.setVisible(False)
         self.row.addWidget(self.second)
-        self.row.addStretch(1)
         self.row.addWidget(QtWidgets.QLabel("Talk to", parent))
         self.combo = QtWidgets.QComboBox(parent)
         self.combo.setObjectName("CADWiz_AI_App")
+        self.combo.setMinimumWidth(0)
+        self.combo.setMinimumContentsLength(8)
+        self.combo.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.combo.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        self.combo.setToolTip("Choose the assistant you use, or automatically use the open app.")
         self.combo.addItems(list(AI_APPS.values()))
         self.keys = list(AI_APPS)
         self.combo.setCurrentIndex(self.keys.index(panel.prefs.ai_app))
         self.combo.currentIndexChanged.connect(self.choose)
-        self.row.addWidget(self.combo)
+        self.row.addWidget(self.combo, 1)
 
     def choose(self, index: int) -> None:
         self.panel.prefs.ai_app = self.keys[index]
