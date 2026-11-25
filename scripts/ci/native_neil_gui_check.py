@@ -74,25 +74,10 @@ def check(app, gui, folder, panel):
     assert result.get('ok') and result.get('verification_status')=='VERIFIED SUCCESS',result
     assert abs(result['dimensional_verification']['inner_radius_change_mm']+.8)<.001
     assert hashes==[file_hash(a.FileName),file_hash(b.FileName)] and before_pid==os.getpid()
-    gui.updateGui()
-    live_view = view_link.active_view(gui)
-    assert live_view is not None, 'Native MDI viewport must be active after reload'
-    width, height = live_view.getSize()
-    assert width >= 160 and height >= 120, (width, height)
-    hits = sum(bool(live_view.getObjectInfo((int(width*x/10), int(height*y/10))))
-               for x in range(1,10) for y in range(1,10))
-    assert hits > 0, 'The actual active native viewport must contain the edited model'
-    from PySide import QtWidgets
-    mdi = gui.getMainWindow().findChild(QtWidgets.QMdiArea)
-    assert mdi is not None and mdi.activeSubWindow() is not None
-    native_image = mdi.viewport().grab().toImage()
-    colors = {native_image.pixel(x,y) for x in range(0,native_image.width(),5)
-              for y in range(0,native_image.height(),5)}
-    assert len(colors) > 32, 'Native viewport paint is blank or stale'
-    native_image.save(str(folder/'native-viewport-verified.png'))
-    stage('native-viewport-verified', native_viewport={'width':width,'height':height,
-          'geometry_hits':hits,'paint_colors':len(colors)})
-    screenshot=folder/'pointer-edit-verified.png';gui.getMainWindow().grab().save(str(screenshot))
+    from native_viewport_check import verify
+    native_viewport = verify(app,gui,session.document_authority,folder)
+    stage('native-viewport-verified',native_viewport=native_viewport)
+    screenshot=folder/'pointer-edit-verified.png'
     for document in list(app.listDocuments().values()):
         if document.FileName and Path(document.FileName).resolve().is_relative_to(folder.resolve()):app.closeDocument(document.Name)
     return {'status':'PASS','pointer_to_annular_floor':True,'highlight_geometry_resolved':True,
