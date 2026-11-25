@@ -49,7 +49,7 @@ def test_reconnect_uses_real_connector_and_selected_app(tmp_path, monkeypatch):
         assert calls == ["hello"]
         req = urllib.request.Request(f"http://127.0.0.1:{server.server_port}/reconnect", data=b"{}")
         with pytest.raises(urllib.error.HTTPError) as error:
-            urllib.request.urlopen(req)
+            urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req)
         assert error.value.code == 403
         assert calls == ["hello"]
     finally:
@@ -62,6 +62,22 @@ def test_failed_connector_does_not_claim_connection(tmp_path, monkeypatch):
     server = control.start("chatgpt", lambda: False)
     try:
         assert not control.reconnect("chatgpt")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_loopback_reconnect_does_not_use_global_proxy_opener(tmp_path, monkeypatch):
+    monkeypatch.setattr(control, "directory", lambda: tmp_path)
+    class Proxy:
+        def open(self, *_args, **_kwargs):
+            raise urllib.error.URLError("proxy refuses local destinations")
+    monkeypatch.setattr(urllib.request, "_opener", Proxy())
+    calls = []
+    server = control.start("chatgpt", lambda: calls.append("real connector") or True)
+    try:
+        assert control.reconnect("chatgpt")
+        assert calls == ["real connector"]
     finally:
         server.shutdown()
         server.server_close()

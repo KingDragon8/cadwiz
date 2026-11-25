@@ -51,6 +51,9 @@ def start(app: str, reconnect: Callable[[], bool]) -> ThreadingHTTPServer:
 
 def reconnect(app: str) -> bool:
     """Ask a connector to check in; never manufacture a heartbeat in the panel."""
+    # This authenticated endpoint is strictly loopback. Never route its token
+    # through a system proxy or an opener configured for unrelated web traffic.
+    local_http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     for path in directory().glob("*.json"):
         with contextlib.suppress(OSError, ValueError, TimeoutError, KeyError, TypeError):
             info = json.loads(path.read_text(encoding="utf-8"))
@@ -60,7 +63,7 @@ def reconnect(app: str) -> bool:
                 f"http://127.0.0.1:{int(info['port'])}/reconnect", data=b"{}",
                 headers={"X-CADWiz-Token": str(info['token'])}, method="POST",
             )
-            with urllib.request.urlopen(request, timeout=10) as response:
+            with local_http.open(request, timeout=10) as response:
                 if json.load(response).get("connected"):
                     return True
     return False
