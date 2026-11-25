@@ -11,6 +11,12 @@ operation. Once a target is protected, changing that authority requires your
 Working file button. A label shared by several files is ambiguous; use an exact
 document Name or full file path. Window focus alone does not authorize a target.
 
+Existing files are matched by filesystem identity, including on case-sensitive
+volumes. A reload preserves unrelated unsaved documents. Version histories keep
+their established locations and validate which file owns them. If two case-only
+names would share an older history or edit session, CADWiz refuses that ambiguity;
+create a uniquely named working copy instead. No history is silently merged.
+
 Point and Highlight keep their existing behavior. Frozen frames additionally
 carry native geometry references where a mark actually lands on a face or edge.
 A visual annotation without a native reference remains a visual annotation.

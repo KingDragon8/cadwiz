@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ai_freecad_core.ai_master.flags import read_settings, write_setting
+from ai_freecad_core.ai_master.adopted import same_file
 from ai_freecad_core.ai_master.project_store import Project
 from ai_freecad_core.ai_master.units import both
 from ai_freecad_core.conversation.founder_words import PLAIN_ERROR, clean_reply
@@ -100,6 +101,7 @@ class PluginSession:
         self._factory = executor_factory or _adopted_executor
         self._pump = pump
         self._executors: dict[str, Any] = {}
+        self._executor_sources: dict[str, str] = {}
         self.log_path = Path(log_path) if log_path else plugin_data_dir() / "tool-calls.jsonl"
         self.register_project_root(self.project.folder)
         self._section_runner = section_runner
@@ -323,13 +325,19 @@ class PluginSession:
         file_name = self._file_of(document)
         key = str(Path(file_name).resolve()).casefold()
         executor = self._executors.get(key)
+        if executor is not None and not self._executor_matches(key, executor, file_name):
+            raise ControlError('TARGET UNRESOLVED', 'These file names cannot safely share an edit session. Use a uniquely named working copy; neither file was changed.')
         if executor is None:
             label = str(getattr(document, "Label", "") or Path(file_name).stem)
             project = self._project_for(file_name)
-            executor = self._factory(project, label, file_name, pump=self._pump,
-                                     snapshot_open=lambda dest, doc_name=document.Name: self._snapshot(doc_name, file_name, dest),
-                                     reload=self._reload, current_view=self._capture_view)
+            try:
+                executor = self._factory(project, label, file_name, pump=self._pump,
+                                         snapshot_open=lambda dest, doc_name=document.Name: self._snapshot(doc_name, file_name, dest),
+                                         reload=self._reload, current_view=self._capture_view)
+            except PermissionError as error:
+                raise ControlError('TARGET UNRESOLVED', str(error)) from error
             self._executors[key] = executor
+            self._executor_sources[key] = str(Path(file_name).resolve())
             with contextlib.suppress(Exception):
                 # His own printer from Setup, for the print check (ORDER-2026-10-18-03).
                 from integrations.cadwiz_plugin import preferences_store
@@ -339,6 +347,9 @@ class PluginSession:
                 # A backup of a model that is already broken is recorded as broken,
                 # so the time slider can mark it red (ORDER-2026-10-18-01).
                 executor.store.health_probe = lambda _path, name=document.Name: self._broken_objects(name)
+        # Reload may replace a document with a different internal Name. Always
+        # snapshot the current authorized live document, including unsaved work.
+        executor._snapshot_open = lambda dest: self._snapshot(document.Name, file_name, dest)
         if adopt and not getattr(executor, "adoption", None):
             executor.adopt()
             executor.adopted_at_version = executor.store.latest()
@@ -361,6 +372,11 @@ class PluginSession:
         executor.check_operation_revision = guard_before_apply
         self.state.update(document=str(getattr(document, "Label", "")), file=file_name, object=str((executor.adoption or {}).get("main_object", "")))
         return executor
+
+    def _executor_matches(self, key: str, executor: Any, file_name: str) -> bool:
+        source = getattr(self, '_executor_sources', {}).get(key)
+        source = source or getattr(executor, 'original_source', None) or getattr(executor, 'founder_file', None)
+        return source is not None and same_file(source, file_name)
 
     def register_project_root(self, folder: Path) -> None:
         """Remember old stores when the user changes where new projects are saved."""
@@ -404,9 +420,10 @@ class PluginSession:
         file_name = str(getattr(document, "FileName", "") or "")
         if not file_name:
             return None
-        executor = self._executors.get(str(Path(file_name).resolve()).casefold())
+        key = str(Path(file_name).resolve()).casefold()
+        executor = self._executors.get(key)
         if executor is not None:
-            return executor.store
+            return executor.store if self._executor_matches(key, executor, file_name) else None
         import hashlib
 
         from ai_freecad_core.ai_master.adopted import AdoptedStore
@@ -418,7 +435,10 @@ class PluginSession:
         folder = self._project_for(file_name).folder / "objects" / safe_name(label) / "adopted" / file_key
         if not folder.is_dir():
             return None
-        return AdoptedStore(folder, file_name)
+        try:
+            return AdoptedStore(folder, file_name, read_only=True)
+        except (OSError, ValueError, TypeError):
+            return None
 
     def version_pictures(self, document: Any, version: int) -> dict[str, Any]:
         """For "Compare with now": a picture of `version` and of the model as it is
@@ -442,7 +462,16 @@ class PluginSession:
 
     def _snapshot(self, document_name: str, file_name: str, dest: str) -> None:
         """The document exactly as it is open (unsaved changes included) -> dest."""
-        document = dict(self.app.listDocuments()).get(document_name)
+        documents = dict(self.app.listDocuments())
+        document = documents.get(document_name)
+        if document is None or not same_file(str(getattr(document, 'FileName', '') or ''), file_name):
+            matches = [doc for doc in documents.values()
+                       if getattr(doc, 'FileName', '') and same_file(doc.FileName, file_name)]
+            preferred = getattr(getattr(self, 'document_authority', None), 'target_name', '')
+            document = next((doc for doc in matches if doc.Name == preferred), None)
+            if document is None and len(matches) > 1:
+                raise ControlError('TARGET UNRESOLVED', 'Several open documents refer to this file. Select the working document before changing it.')
+            document = document or (matches[0] if matches else None)
         if document is not None and hasattr(document, "saveCopy"):
             document.saveCopy(dest)
         else:
@@ -451,13 +480,19 @@ class PluginSession:
     def _reload(self, path: str) -> None:
         """After a change was written to the file: show it in his FreeCAD -- visible,
         in the 3D view, turned to the iso view and framed, with nothing for him to press."""
-        target = str(Path(path).resolve()).casefold()
         shown = visible_in_file(path)
-        for name, document in list(dict(self.app.listDocuments()).items()):
-            if str(Path(str(getattr(document, "FileName", "") or "")).resolve()).casefold() == target:
-                self.app.closeDocument(name)
-                break
+        matches = [(name, doc) for name, doc in dict(self.app.listDocuments()).items()
+                   if getattr(doc, 'FileName', '') and same_file(doc.FileName, path)]
+        authority = getattr(self, 'document_authority', None)
+        chosen = next((pair for pair in matches if pair[0] == getattr(authority, 'target_name', '')), None)
+        if chosen is None and len(matches) > 1:
+            raise ControlError('TARGET UNRESOLVED', 'Several open documents refer to this file; none was closed.')
+        chosen = chosen or (matches[0] if matches else None)
+        if chosen is not None:
+            self.app.closeDocument(chosen[0])
         reopened = self.app.openDocument(path)
+        if authority is not None and same_file(authority.target_path, path):
+            authority.target_name = reopened.Name
         with contextlib.suppress(Exception):
             self.app.setActiveDocument(reopened.Name)
         if self.gui is not None:

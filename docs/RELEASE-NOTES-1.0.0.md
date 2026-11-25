@@ -3,6 +3,7 @@
 - A prominent home-panel help button offers connected-assistant help and email support.
 - Version-matched help explains installation, connection and diagnostic workflows.
 - Explicit source/working-document protection prevents a variant edit from silently targeting the active or similarly named file.
+- Filesystem identity protects case-only sibling files and unrelated unsaved documents; existing version histories receive ownership checks without moving their records.
 - Native Point/Highlight geometry references distinguish resolved features from visual annotations and detect stale selections.
 - Supported annular Pocket/Pad changes independently verify direction, actual dimensions, curvature, unrelated geometry and native save/reopen results.
 - Headless transaction rollback enables FreeCAD undo explicitly; failed edits cannot leave an old verified-success status visible.

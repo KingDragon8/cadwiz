@@ -263,7 +263,7 @@ def test_the_time_slider_reads_versions_without_starting_the_worker(session, tmp
 
 def test_old_version_records_without_the_broken_field_still_read(tmp_path) -> None:
     store = AdoptedStore(tmp_path / "records", tmp_path / "His.FCStd")
-    (tmp_path / "records" / "adopted.v1.json").write_text(json.dumps({"version": 1, "file": "x", "sha256": "a", "diff": "d"}))
+    (tmp_path / "records" / "adopted.v1.json").write_text(json.dumps({"version": 1, "file": str(tmp_path / "His.v1.FCStd"), "sha256": "a", "diff": "d"}))
     assert store.get(1).broken == []
 
 

@@ -150,6 +150,14 @@ QtCore.QTimer.singleShot(12000, finish)
         results.append({'test': label, 'status': 'PASS', **record})
         save_results()
     install()
+    if case_sensitive:
+        identity_report=out/'case-identity-report.json'
+        run([python,repo/'scripts/ci/native_case_identity_check.py','--folder',qa/'CaseDocNames',
+             '--output',identity_report])
+        identity=json.loads(identity_report.read_text())
+        assert identity['status']=='PASS', identity
+        results.append({'test':'case-sensitive-document-identity','status':'PASS','document_identity':identity})
+        save_results()
     startup('clean-install')
     preference = qa/'plugin-data/CADWiz/plugin/preferences.json'
     preference.parent.mkdir(parents=True, exist_ok=True)

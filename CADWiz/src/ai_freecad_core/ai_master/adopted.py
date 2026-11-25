@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import time
@@ -48,6 +49,22 @@ def version_path(founder_file: str | Path, version: int) -> Path:
     return path.with_name(f"{stem}.v{version}.FCStd")
 
 
+def same_file(first: str | Path, second: str | Path) -> bool:
+    """Existing filesystem identity; missing paths require exact spelling.
+
+    Case sensitivity is a filesystem property, including on macOS and Windows.
+    Never infer that two distinct files are identical by folding their names.
+    """
+    try:
+        a, b = Path(first).resolve(), Path(second).resolve()
+        try:
+            return a.samefile(b)
+        except OSError:
+            return os.fspath(a) == os.fspath(b)
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
 @dataclass(slots=True)
 class AdoptedVersion:
     version: int
@@ -70,28 +87,63 @@ class AdoptedStore:
     """Versions of one adopted file. Records live in the project; the version
     FILES live beside the founder's file, so he finds them where his work is."""
 
-    def __init__(self, record_folder: str | Path, founder_file: str | Path) -> None:
+    def __init__(self, record_folder: str | Path, founder_file: str | Path, *, read_only: bool = False) -> None:
         self.folder = Path(record_folder)
         self.folder.mkdir(parents=True, exist_ok=True)
         self.founder_file = Path(founder_file)
+        self.read_only = read_only
+        self._binding = self.folder / "source.json"
+        if not self._binding.exists():
+            # Preserve established keys and version files. An old history must
+            # prove its ownership before a new binding can be claimed.
+            for record in self.folder.glob("adopted.v*.json"):
+                self._check_record_owner(json.loads(record.read_text(encoding="utf-8")))
+            if not read_only:
+                try:
+                    with self._binding.open("x", encoding="utf-8") as handle:
+                        json.dump({"schema": 1, "founder_file": str(self.founder_file.resolve())}, handle)
+                except FileExistsError:
+                    pass  # A concurrent claim must still match below.
+        self._check_binding()
         self._session_backed_up = False
         #: Optional `probe(version_file) -> [labels of objects in error]`, set by
         #: whoever has the open document (the Claude plug-in's session); a backup
         #: of a model that was already broken is recorded as broken.
         self.health_probe: Any = None
 
+    def _check_binding(self) -> None:
+        if not self._binding.exists():
+            if self.read_only:
+                return
+            raise PermissionError("Version history has no verified file binding; nothing was changed.")
+        try:
+            owner = json.loads(self._binding.read_text(encoding="utf-8"))["founder_file"]
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise PermissionError("Version history ownership is unreadable; nothing was changed.") from error
+        if not isinstance(owner, str) or not same_file(owner, self.founder_file):
+            raise PermissionError("Version history belongs to a different file. Use a uniquely named working copy.")
+
+    def _check_record_owner(self, record: dict[str, Any]) -> None:
+        saved = str(record.get("file") or "")
+        match = _VERSION_RE.search(Path(saved).name)
+        if not match or not same_file(saved, version_path(self.founder_file, int(match.group(1)))):
+            raise PermissionError("Version history contains another file's versions; nothing was changed.")
+
     # ---- records ----------------------------------------------------------
     def _record_path(self, version: int) -> Path:
         return self.folder / f"adopted.v{version}.json"
 
     def latest(self) -> int:
+        self._check_binding()
         return max((int(p.stem.split(".v")[1]) for p in self.folder.glob("adopted.v*.json")), default=0)
 
     def get(self, version: int) -> AdoptedVersion | None:
+        self._check_binding()
         path = self._record_path(version)
         if not path.exists():
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
+        self._check_record_owner(data)
         known = set(AdoptedVersion.__dataclass_fields__)
         return AdoptedVersion(**{k: v for k, v in data.items() if k in known})
 
@@ -104,12 +156,18 @@ class AdoptedStore:
         return [v for n in range(max(1, latest - limit + 1), latest + 1) if (v := self.get(n)) is not None]
 
     def _save(self, record: AdoptedVersion) -> AdoptedVersion:
+        self._check_binding()
+        if self.read_only:
+            raise PermissionError("This version-history view is read-only.")
+        self._check_record_owner(asdict(record))
         record.utc = record.utc or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         self._record_path(record.version).write_text(json.dumps(asdict(record), indent=2, default=str), encoding="utf-8")
         return record
 
     def next_version_file(self) -> Path:
         """The file the next version will be written to. Never an existing file."""
+        if self.read_only:
+            raise PermissionError("This version-history view is read-only.")
         n = self.latest() + 1
         candidate = version_path(self.founder_file, n)
         while candidate.exists():                 # a version file from an earlier history: never overwritten
@@ -140,8 +198,9 @@ class AdoptedStore:
                                 diff="backup of the model as it was before any change" if self.latest() == 0 else "your model as it stood before this change",
                                 note=note or "backup", kind="backup", measurements=measurements or {}, render=render,
                                 broken=list(broken or []))
+        saved = self._save(record)
         self._session_backed_up = True
-        return self._save(record)
+        return saved
 
     def require_backup(self) -> None:
         """Called before ANY write to the founder's file. Refuses otherwise."""
