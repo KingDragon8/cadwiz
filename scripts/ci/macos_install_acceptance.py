@@ -129,7 +129,8 @@ QtCore.QTimer.singleShot(12000, finish)
         if label == 'clean-install' and record.get('error'):
             # Capture the actual headless snapshot descriptors, without changing
             # the fixture or concealing the original GUI assertion failure.
-            fixture=out/'neil-gui'/'Working.FCStd'
+            fixture=out/'neil-gui'/'WorkerSnapshot.FCStd'
+            if not fixture.is_file():fixture=out/'neil-gui'/'Working.FCStd'
             if fixture.is_file():
                 probe=subprocess.run([str(python),str(repo/'scripts/ci/native_reference_probe.py'),str(fixture),str(fixture.parent/'worker-reference.json')],
                                      env=env,capture_output=True,text=True,timeout=30)

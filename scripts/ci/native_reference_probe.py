@@ -7,7 +7,7 @@ import sys
 
 assert os.environ.get('CI') == 'true', 'Disposable CI fixtures only'
 source=Path(sys.argv[1]).resolve();output=Path(sys.argv[2]).resolve()
-assert source.name=='Working.FCStd' and source.parent.name=='neil-gui'
+assert source.name in ('Working.FCStd','WorkerSnapshot.FCStd') and source.parent.name=='neil-gui'
 assert output.parent==source.parent
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'CADWiz/src'))
 import FreeCAD as App  # noqa: E402

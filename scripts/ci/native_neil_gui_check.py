@@ -3,6 +3,8 @@
 from pathlib import Path
 import os
 import json
+import contextlib
+import shutil
 
 
 def check(app, gui, folder, panel):
@@ -63,6 +65,10 @@ def check(app, gui, folder, panel):
     operation=intent(target);operation['reference']=references[0]['reference']
     stage('starting-protected-native-edit',intent=operation)
     result=session.call('annular_edit',{'document':target.Name,'intent':operation})
+    with contextlib.suppress(OSError,AttributeError):
+        executor=session._executors.get(str(Path(target.FileName).resolve()).casefold())
+        if executor is not None:
+            shutil.copy2(executor._latest_file(),folder/'WorkerSnapshot.FCStd')
     stage('native-edit-returned', result=result)
     assert result.get('ok') and result.get('verification_status')=='VERIFIED SUCCESS',result
     assert abs(result['dimensional_verification']['inner_radius_change_mm']+.8)<.001
