@@ -12,11 +12,17 @@ REFERENCE_TYPES = ("App::Origin", "App::Line", "App::Plane", "App::Point", "Part
                    "PartDesign::Line", "PartDesign::Point", "PartDesign::CoordinateSystem")
 
 
+def geometric_bounds(shape):
+    """Native geometric bounds, independent of the GUI's display triangulation."""
+    optimal = getattr(shape, 'optimalBoundingBox', None)
+    return optimal(False, False) if callable(optimal) else shape.BoundBox
+
+
 def shape_signature(obj):
     shape = getattr(obj, "Shape", None)
     if shape is None or shape.isNull():
         return None
-    box = shape.BoundBox
+    box = geometric_bounds(shape)
     faces = sorted([type(f.Surface).__name__, round(f.Area, 6),
                     *(round(x, 6) for x in f.CenterOfMass)] for f in shape.Faces)
     return [round(float(x), 6) for x in (shape.Volume, shape.Area, box.XMin, box.YMin, box.ZMin,

@@ -131,7 +131,8 @@ def geometry_reference(document, obj, element):
     shape = obj.Shape.getElement(element)
     center = getattr(shape, 'CenterOfMass', None)
     geometry = getattr(shape, 'Surface', getattr(shape, 'Curve', None))
-    box = shape.BoundBox
+    from integrations.ai_master.parametric_checks import geometric_bounds
+    box = geometric_bounds(shape)
     properties = {'kind': type(geometry).__name__, 'area': float(getattr(shape, 'Area', 0)),
                   'length': float(getattr(shape, 'Length', 0)),
                   'center': list(center) if center is not None else None,

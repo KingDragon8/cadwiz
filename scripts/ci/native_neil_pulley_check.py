@@ -325,6 +325,21 @@ class Cases(unittest.TestCase):
                                 'geometry':{**original['geometry'],'area':original['geometry']['area']+1}}
         with self.assertRaises(ControlError):prepare(self.a,operation,worker_copy=True)
 
+    def test_T42_display_tessellation_cannot_change_native_reference_or_revision(self):
+        target=self.variant()
+        floor=next('Face'+str(i+1) for i,f in enumerate(target.Pulley.Shape.Faces)
+                   if type(f.Surface).__name__=='Plane' and abs(f.CenterOfMass.z-8)<1e-7)
+        before=geometry_reference(target,target.Pulley,floor)
+        revision=document_revision(target)
+        target.Pulley.Shape.tessellate(2.0)
+        after=geometry_reference(target,target.Pulley,floor)
+        self.assertEqual(before['signature'],after['signature'])
+        self.assertEqual(document_revision(target),revision)
+        self.assertAlmostEqual(after['geometry']['bounds'][1],-24,places=7)
+        self.assertAlmostEqual(after['geometry']['bounds'][4],24,places=7)
+        result=self.session.call('annular_edit',{'document':target.Name,'intent':intent(target,reference=after)})
+        self.assertTrue(result['ok'],result)
+
 
 if __name__ == '__main__':
     class Result(unittest.TextTestResult):
