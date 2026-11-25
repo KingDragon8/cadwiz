@@ -138,7 +138,7 @@ QtCore.QTimer.singleShot(12000, finish)
         assert record['workbench_registered'] and record['panel_visible'], record
         assert record['support_button_visible'] and record['working_file_button_visible'], record
         if label == 'clean-install':
-            assert record['neil_native_gui']['status'] == 'PASS', record
+            assert record.get('neil_native_gui', {}).get('status') == 'PASS', record
         assert record['cadwiz_version'] == '1.0.0', record
         assert record['communication_title'] == 'Wiz communication screen' and record['guidance_present'], record
         assert record['aiwiz_tabs'] == ['AI Wiz Setup', 'AI Wiz Management'], record

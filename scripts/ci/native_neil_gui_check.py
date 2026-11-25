@@ -64,9 +64,10 @@ def check(app, gui, folder, panel):
     assert selected and selected[0]['geometry_references'],selected
     operation=intent(target);operation['reference']=references[0]['reference']
     stage('starting-protected-native-edit',intent=operation)
+    target_file = str(Path(target.FileName).resolve()).casefold()
     result=session.call('annular_edit',{'document':target.Name,'intent':operation})
     with contextlib.suppress(OSError,AttributeError):
-        executor=session._executors.get(str(Path(target.FileName).resolve()).casefold())
+        executor=session._executors.get(target_file)
         if executor is not None:
             shutil.copy2(executor._latest_file(),folder/'WorkerSnapshot.FCStd')
     stage('native-edit-returned', result=result)
