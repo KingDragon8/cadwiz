@@ -14,6 +14,8 @@ import time
 import io
 import zipfile
 
+from ai_freecad_core.ai_master.adopted import same_file
+
 
 class ControlError(ValueError):
     def __init__(self, status, message):
@@ -105,7 +107,7 @@ class DocumentAuthority:
         if self.mode == 'inspect':
             raise ControlError('USER INPUT REQUIRED', 'This operation is read-only. Authorize an edit or create a variant first.')
         actual = str(getattr(target, 'FileName', '') or '')
-        if not actual or Path(actual).resolve() != Path(self.target_path).resolve():
+        if not actual or not same_file(actual, self.target_path):
             raise ControlError('TARGET UNRESOLVED', 'The edit target is protected. Use the authorized working document: ' + self.target_name)
         self.check_source(app)
 
@@ -116,7 +118,7 @@ class DocumentAuthority:
             raise ControlError('VERIFICATION FAILED', 'The original source file changed. Stop and inspect it before continuing.')
         for document in app.listDocuments().values():
             path = str(getattr(document, 'FileName', '') or '')
-            if path and Path(path).resolve() == Path(self.source_path).resolve() and live_state_fingerprint(document) != self.source_revision:
+            if path and same_file(path, self.source_path) and live_state_fingerprint(document) != self.source_revision:
                 raise ControlError('VERIFICATION FAILED', 'The original open source document changed. Its working state must be reviewed.')
 
     def record(self):

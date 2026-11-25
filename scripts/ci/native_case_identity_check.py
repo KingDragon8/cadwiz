@@ -39,6 +39,14 @@ def main():
     sha=lambda path:hashlib.sha256(path.read_bytes()).hexdigest()
     original=[sha(a_path),sha(b_path)]
     session=PluginSession(app=app,gui=None,project_root=folder/'projects',log_path=folder/'calls.jsonl')
+    authority=DocumentAuthority('modify',str(a_path),a.Name)
+    authority.check(app,a)
+    try:
+        authority.check(app,b)
+    except ControlError:
+        pass
+    else:
+        raise AssertionError('Document authority accepted a case-only sibling')
     first=session._executor(a,adopt=False)
     try:
         session._executor(b,adopt=False)

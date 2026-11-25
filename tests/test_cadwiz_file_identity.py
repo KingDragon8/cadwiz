@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from ai_freecad_core.ai_master.adopted import AdoptedStore
-from integrations.cadwiz_plugin.engineering_control import ControlError
+from integrations.cadwiz_plugin.engineering_control import ControlError, DocumentAuthority
 from integrations.cadwiz_plugin.session import PluginSession
 
 
@@ -47,6 +47,9 @@ def test_cached_executor_cannot_be_rebound_to_a_case_only_sibling(tmp_path,monke
                                store=SimpleNamespace(latest=lambda:0,current=lambda:None))
     session=PluginSession(app=SimpleNamespace(listDocuments=lambda:{d.Name:d for d in docs}),
         project_root=tmp_path/'projects',log_path=tmp_path/'calls.jsonl',executor_factory=factory)
+    DocumentAuthority('modify',str(a),'First').check(SimpleNamespace(),docs[0])
+    with pytest.raises(ControlError):
+        DocumentAuthority('modify',str(a),'First').check(SimpleNamespace(),docs[1])
     session._executor(docs[0],adopt=False)
     with pytest.raises(ControlError,match='uniquely named'):
         session._executor(docs[1],adopt=False)
@@ -81,3 +84,18 @@ def test_snapshot_follows_live_file_after_document_name_changes(tmp_path):
     target=tmp_path/'snapshot.FCStd'
     session._snapshot('BeforeReload',str(source),str(target))
     assert target.read_bytes()==b'unsaved live work' and source.read_bytes()==b'saved'
+
+
+def test_document_authority_uses_physical_identity_for_existing_aliases(tmp_path):
+    import os
+    source=tmp_path/'Actual.FCStd';source.write_bytes(b'original')
+    alias=tmp_path/'Alias.FCStd'
+    try:
+        os.link(source,alias)
+    except OSError as error:
+        pytest.skip('Native hard-link creation unavailable: '+str(error))
+    authority=DocumentAuthority('modify',str(source),'Working')
+    authority.check(SimpleNamespace(),SimpleNamespace(FileName=str(alias)))
+    other=tmp_path/'Other.FCStd';other.write_bytes(b'other')
+    with pytest.raises(ControlError):
+        authority.check(SimpleNamespace(),SimpleNamespace(FileName=str(other)))
