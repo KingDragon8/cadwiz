@@ -99,3 +99,20 @@ def test_document_authority_uses_physical_identity_for_existing_aliases(tmp_path
     other=tmp_path/'Other.FCStd';other.write_bytes(b'other')
     with pytest.raises(ControlError):
         authority.check(SimpleNamespace(),SimpleNamespace(FileName=str(other)))
+
+
+def test_reloaded_executor_refreshes_health_probe_document_name(tmp_path,monkeypatch):
+    source=tmp_path/'Working.FCStd';source.write_bytes(b'original')
+    monkeypatch.setenv('CADWIZ_SETTINGS_FILE',str(tmp_path/'settings.json'))
+    doc=lambda name:SimpleNamespace(Name=name,Label='Shared',FileName=str(source),Objects=[])
+    first,reloaded=doc('BeforeReload'),doc('AfterReload')
+    store=SimpleNamespace(latest=lambda:0,current=lambda:None)
+    executor=SimpleNamespace(original_source=source,adoption={},store=store)
+    session=PluginSession(app=SimpleNamespace(listDocuments=lambda:{reloaded.Name:reloaded}),
+        project_root=tmp_path/'projects',log_path=tmp_path/'calls.jsonl',
+        executor_factory=lambda *args,**kwargs:executor)
+    seen=[]
+    session._broken_objects=lambda name:seen.append(name) or ['BrokenPad']
+    session._executor(first,adopt=False)
+    session._executor(reloaded,adopt=False)
+    assert store.health_probe(None)==['BrokenPad'] and seen==['AfterReload']

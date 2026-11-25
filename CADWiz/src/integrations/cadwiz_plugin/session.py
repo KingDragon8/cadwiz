@@ -350,6 +350,8 @@ class PluginSession:
         # Reload may replace a document with a different internal Name. Always
         # snapshot the current authorized live document, including unsaved work.
         executor._snapshot_open = lambda dest: self._snapshot(document.Name, file_name, dest)
+        with contextlib.suppress(Exception):
+            executor.store.health_probe = lambda _path, name=document.Name: self._broken_objects(name)
         if adopt and not getattr(executor, "adoption", None):
             executor.adopt()
             executor.adopted_at_version = executor.store.latest()
