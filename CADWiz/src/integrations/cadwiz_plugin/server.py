@@ -179,9 +179,13 @@ def _bridge() -> dict[str, Any] | None:
 
 
 def _send(info: dict[str, Any], route: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
-    request = urllib.request.Request(f"http://127.0.0.1:{info['port']}/{route}", data=json.dumps(payload).encode("utf-8"),
+    from integrations.cadwiz_plugin.loopback_http import opener
+    port = info.get('port')
+    if type(port) is not int or not 1 <= port <= 65535 or route not in {'hello', 'call'}:
+        raise ValueError('Invalid local bridge endpoint')
+    request = urllib.request.Request(f"http://127.0.0.1:{port}/{route}", data=json.dumps(payload).encode("utf-8"),
                                      headers={"Content-Type": "application/json", "X-CADWiz-Token": str(info.get("token", ""))}, method="POST")
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with opener().open(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -487,6 +491,7 @@ def build_server() -> Any:
 
 def main() -> None:
     from integrations.cadwiz_plugin.connection_control import start
+    from integrations.cadwiz_plugin.bridge import app_of
 
     def reconnect() -> bool:
         info = _bridge()
@@ -494,7 +499,7 @@ def main() -> None:
             return False
         return bool(_send(info, "hello", {"client": client_name(), "working_here": True}, timeout=5).get("ok"))
 
-    start("chatgpt" if "chatgpt" in client_name().lower() else "claude", reconnect)
+    start(app_of(client_name()), reconnect)
     threading.Thread(target=_heartbeat, name="cadwiz-heartbeat", daemon=True).start()
     build_server().run()
 

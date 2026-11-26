@@ -21,11 +21,12 @@ import queue
 import secrets
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Callable
 
 from integrations.cadwiz_plugin.session import plugin_data_dir
+from integrations.cadwiz_plugin.loopback_http import LoopbackHTTPServer
 
 #: How long after the last hello the panel still says "Connected to Claude".
 CONNECTED_WITHIN_S = 90.0
@@ -101,7 +102,7 @@ class Bridge:
                 self.end_headers()
                 self.wfile.write(data)
 
-        self._server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        self._server = LoopbackHTTPServer(("127.0.0.1", port), Handler)
         self.port = self._server.server_address[1]
         self._thread = threading.Thread(target=self._server.serve_forever, name="cadwiz-plugin-bridge", daemon=True)
 

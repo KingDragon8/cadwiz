@@ -1,12 +1,12 @@
 ; SPDX-License-Identifier: LGPL-2.1-or-later
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "0.9.8"
 #endif
 #ifndef SourceRoot
   #define SourceRoot "..\.."
 #endif
 #ifndef OutputPath
-  #define OutputPath "..\..\..\..\outputs\CADWiz-1.0.0-Beta"
+  #define OutputPath "..\..\..\..\outputs\CADWiz-0.9.8-Beta"
 #endif
 [Setup]
 AppId=CADWiz

@@ -27,21 +27,19 @@ no request itself.
 """
 
 [[allowed]]
-path = "CADWiz/src/integrations/cadwiz_plugin/server.py"
-purpose = "Forward Claude Desktop's CADWiz tool calls to the CADWiz bridge inside the founder's own running FreeCAD"
-sends = "The tool name and its arguments (e.g. a measurement question, FreeCAD code Claude wrote, a version number), and the bridge's secret token -- to 127.0.0.1 only"
-receives = "The tool's plain result (measurements, version records, render file paths) from the founder's own FreeCAD"
+path = "CADWiz/src/integrations/cadwiz_plugin/loopback_http.py"
+purpose = "Shared numeric loopback transport for authenticated FreeCAD bridge calls and connector check-ins"
+sends = "Local tool arguments or a hello/reconnect request plus a local authentication token, exclusively to numeric 127.0.0.1 HTTP endpoints"
+receives = "Authenticated local bridge results and connector check-in confirmations"
 hosts = ["127.0.0.1"]
 user_initiated = true
 justification = """
-ORDER-2026-10-12-05 (founder ruling: CADWiz becomes a plug-in for Claude
-Desktop). The MCP server Claude Desktop starts is a separate process from
-FreeCAD; the only way it can reach the founder's open documents is the local
-bridge. The address is hard-wired to 127.0.0.1 (the bridge binds only there
-and refuses any request without the token from the founder's own
-%LOCALAPPDATA%), so nothing leaves the machine through this call. What Claude
-Desktop itself sends to Anthropic is the founder's own conversation in his
-own Claude app, outside CADWiz.
+Existing owner-authorized local bridge and reconnect boundaries, consolidated
+without adding any external destination. Both listeners refuse non-loopback
+binds and omit display-only DNS resolution. The client rejects other schemes,
+hosts, user-info and redirects, and bypasses global/system proxies. Caller port
+validation and server token checks remain required. Model tool requests are not
+retried; only the idempotent reconnect hello may repeat after a lost response.
 """
 
 [[allowed]]
@@ -63,7 +61,7 @@ runs on a background thread so FreeCAD's window keeps answering.
 [[allowed]]
 path = "CADWiz/src/integrations/cadwiz_plugin/feedback.py"
 purpose = "ORDER-2026-10-21-01 (open-source release, Addendum One Part B): Claude as CADWiz's help desk -- read the project's known-issues list, and file a bug, idea or question the user asked Claude to send"
-sends = "Known issues: a plain GET, nothing of the user's. Feedback: ONLY after the user has seen a preview and said yes -- the title and text, public or private, and the error report items they kept ticked (error code and message, last 10 steps, versions, a screenshot of FreeCAD; the model file only if ticked), scrubbed of file paths, the user name and key-like strings; plus the cadwiz.app session token from the user's own sign-in"
+sends = "Known issues: a plain GET, nothing of the user's. Confirmed feedback: previewed title/text, error code, recent steps and versions, scrubbed of paths, user names and key-like strings; a supported private viewport screenshot may be previewed and included. FreeCAD model files and legacy whole-window screenshots are refused. Includes the cadwiz.app session token from the user's sign-in."
 receives = "The known-issues list (status.json); the new thread's id, status and link; a sign-in link and session token"
 hosts = ["cadwiz.app"]
 user_initiated = true
@@ -77,11 +75,3 @@ stand-in that fails if touched). The module refuses any host but
 https://cadwiz.app. It runs in the plug-in's server process, never on FreeCAD's
 window thread, and nothing is ever reported in the background.
 """
-[[allowed]]
-path = "CADWiz/src/integrations/cadwiz_plugin/connection_control.py"
-purpose = "User-initiated reconnect of the selected local MCP connector"
-sends = "An empty reconnect request and a local authentication token; no model, account, or conversation data"
-receives = "Whether the real connector successfully checked in with FreeCAD"
-hosts = ["127.0.0.1"]
-user_initiated = true
-justification = "The Connect button requests a fresh authenticated heartbeat from the running MCP connector. Both control and bridge endpoints bind only to loopback."

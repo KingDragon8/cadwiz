@@ -10,10 +10,12 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def worker(folder,host_python=False):
+def worker(folder,host_python=False,production_first=False):
+    phases=[]
     def phase(name, **details):
         record = folder/(name+'.json')
-        record.write_text(json.dumps({'phase':name, **details}, default=str))
+        record.write_text(json.dumps({'phase':name,'sequence':len(phases),'time':time.time(), **details}, default=str))
+        phases.append(name)
         deadline = time.monotonic()+45
         while not (folder/(name+'.continue')).exists():
             if time.monotonic()>deadline:
@@ -36,18 +38,21 @@ def worker(folder,host_python=False):
             self.send_header('Content-Length','2')
             self.end_headers()
             self.wfile.write(b'ok')
-    listener = ThreadingHTTPServer(('127.0.0.1',0), Handler)
-    threading.Thread(target=listener.serve_forever, daemon=True).start()
-    try:
-        phase('02-stdlib-http-bind', server_name=listener.server_name)
-        connection = http.client.HTTPConnection('127.0.0.1',listener.server_port,timeout=5)
-        connection.request('GET','/')
-        assert connection.getresponse().read()==b'ok'
-        connection.close()
-        phase('03-stdlib-http-request')
-    finally:
-        listener.shutdown()
-        listener.server_close()
+    def stdlib_control():
+        listener = ThreadingHTTPServer(('127.0.0.1',0), Handler)
+        threading.Thread(target=listener.serve_forever, daemon=True).start()
+        try:
+            phase('02-stdlib-http-bind', server_name=listener.server_name)
+            connection = http.client.HTTPConnection('127.0.0.1',listener.server_port,timeout=5)
+            connection.request('GET','/')
+            assert connection.getresponse().read()==b'ok'
+            connection.close()
+            phase('03-stdlib-http-request')
+        finally:
+            listener.shutdown()
+            listener.server_close()
+    if not production_first:
+        stdlib_control()
     from integrations.cadwiz_plugin import session, server, connection_control
     session.plugin_data_dir=lambda:folder/'plugin'
     connection_control.directory=lambda:folder/'connectors'
@@ -67,6 +72,10 @@ def worker(folder,host_python=False):
     finally:
         bridge.stop()
         bridge._server.server_close()
+    if production_first:
+        # Run the known problematic stdlib control only AFTER observing the
+        # production transport in an untouched first-run permission state.
+        stdlib_control()
     from integrations.cadwiz_plugin.offline_launcher import prepare
     prepare(ROOT/'CADWiz')
     import mcp
@@ -79,11 +88,12 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--worker',action='store_true')
     parser.add_argument('--host-python',action='store_true',help='Isolate the SDK test-client interpreter, without loading FreeCAD')
+    parser.add_argument('--production-first',action='store_true')
     args=parser.parse_args()
     assert sys.platform=='darwin' and os.environ.get('CI')=='true', 'Disposable Mac CI only'
     args.output.mkdir(parents=True,exist_ok=True)
     if args.worker:
-        worker(args.output,args.host_python)
+        worker(args.output,args.host_python,args.production_first)
         return
     extra=[]
     if not args.host_python:
@@ -97,6 +107,8 @@ def main():
         command=[sys.executable if args.host_python else str(args.python),str(Path(__file__)), '--worker','--output',str(args.output)]
         if args.host_python:
             command.append('--host-python')
+        if args.production_first:
+            command.append('--production-first')
         process=subprocess.Popen(command,env=env,stdout=log,stderr=log)
         seen=set()
         deadline=time.monotonic()+240

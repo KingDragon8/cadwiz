@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--legacy-addon-archive', type=Path,
                         help='Pinned prior-release CADWiz ZIP fixture when testing an extracted customer download without Git history')
     parser.add_argument('--network-audit', action='store_true', help='Record socket addresses/stacks in disposable CI only')
+    parser.add_argument('--permission-audit-tool', type=Path, help='Require an unobstructed first-run desktop using the verified local OCR tool')
     args = parser.parse_args()
     assert sys.platform == 'darwin' and os.environ.get('CI') == 'true', 'Isolated macOS CI only'
     repo = Path(__file__).resolve().parents[2]
@@ -118,6 +119,15 @@ def finish():
     except Exception:
         result['error'] = traceback.format_exc()
     finally:
+        if PERMISSION_AUDIT_TOOL:
+            try:
+                import subprocess
+                screenshot=Path(RESULT).with_suffix('.desktop.png')
+                subprocess.run(['/usr/sbin/screencapture','-x',str(screenshot)],check=True,timeout=20)
+                checked=subprocess.run([PERMISSION_AUDIT_TOOL,str(screenshot)],capture_output=True,text=True,check=True,timeout=60)
+                result['desktop_permission_audit']=json.loads(checked.stdout)
+            except Exception:
+                result['permission_audit_error']=traceback.format_exc()
         Path(RESULT).write_text(json.dumps(result, indent=2))
         if RUN_NEIL_GUI:
             # Only disposable test documents; avoid an unsaved-file close prompt
@@ -129,11 +139,15 @@ def finish():
 QtCore.QTimer.singleShot(12000, finish)
 '''.replace('RESULT', repr(str(result_file))).replace('RUN_NEIL_GUI', repr(label == 'clean-install'))
    .replace('PULLEY_SCRIPTS', repr(str(repo/'scripts/ci'))).replace('PULLEY_OUTPUT', repr(str(out/'pulley-gui'))))
+        macro.write_text(macro.read_text().replace('PERMISSION_AUDIT_TOOL',repr(str(args.permission_audit_tool) if args.permission_audit_tool else '')))
         command = [gui, macro]
         if offline:
             command = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)', *command]
         run(command)
         record = json.loads(result_file.read_text())
+        if args.permission_audit_tool:
+            assert 'permission_audit_error' not in record, record
+            assert record.get('desktop_permission_audit',{}).get('permission_prompt_detected') is False, record
         if label == 'clean-install' and record.get('error'):
             # Capture the actual headless snapshot descriptors, without changing
             # the fixture or concealing the original GUI assertion failure.

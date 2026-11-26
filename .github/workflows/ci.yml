@@ -4,7 +4,8 @@ name: checks
 on:
   pull_request:
   push:
-    branches: [main, "release/**"]
+    branches: [main, "release/**", "codex/connector-platform-validation"]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -150,7 +151,7 @@ jobs:
       - name: Build the committed customer installer
         run: python scripts/release/build_windows_installer.py --compiler "$env:CADWIZ_INNO_COMPILER" --output windows-release
       - name: Install, upgrade, uninstall and recover using native FreeCAD
-        run: python scripts/ci/windows_installer_acceptance.py --freecad-bin "$env:CADWIZ_TEST_FREECAD_BIN" --installer windows-release/CADWiz-Setup-1.0.0.exe --output windows-acceptance --autodetect
+        run: python scripts/ci/windows_installer_acceptance.py --freecad-bin "$env:CADWIZ_TEST_FREECAD_BIN" --installer windows-release/CADWiz-Setup-0.9.8.exe --output windows-acceptance --autodetect
       - name: Required native launcher MCP handshake, discovery and read-only call
         shell: pwsh
         run: |

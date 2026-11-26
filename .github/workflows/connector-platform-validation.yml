@@ -1,7 +1,8 @@
 name: Native connector platform validation
 on:
+  pull_request:
   push:
-    branches: ["codex/connector-platform-validation"]
+    branches: [main, "release/**", "codex/connector-platform-validation"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,6 +28,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Verify native Mac permission-prompt detector against retained captures
+        if: runner.os == 'macOS'
+        run: |
+          swiftc scripts/ci/mac_permission_audit.swift -o "$RUNNER_TEMP/mac-permission-audit"
+          python scripts/ci/verify_mac_permission_audit.py --tool "$RUNNER_TEMP/mac-permission-audit"
       - name: Build and extract the exact committed distribution
         run: |
           python scripts/release/build_artifact.py --output "$RUNNER_TEMP/distribution"
@@ -78,7 +84,8 @@ jobs:
           "$CADWIZ_TEST_FREECAD_PYTHON" CADWiz/src/integrations/cadwiz_plugin/offline_launcher.py --check
           python -m pytest tests/test_dual_desktop_launcher.py --junitxml="$RUNNER_TEMP/native-launcher-mcp.xml"
           python -c "import xml.etree.ElementTree as E; r=E.parse('$RUNNER_TEMP/native-launcher-mcp.xml'); cases=list(r.iter('testcase')); assert len(cases)==3 and all(not list(c) for c in cases), 'Required launcher tests cannot fail or skip'"
-          python -m pytest tests/test_offline_runtime_identity.py tests/test_cadwiz_connection_control.py
+          python -m pytest tests/test_offline_runtime_identity.py tests/test_cadwiz_connection_control.py tests/test_reconnect_response_recovery.py tests/test_loopback_http_policy.py tests/test_bridge_recovery.py tests/test_egress_scanner_opener.py --junitxml="$RUNNER_TEMP/native-connection-policy.xml"
+          python -c "import xml.etree.ElementTree as E; cases=list(E.parse('$RUNNER_TEMP/native-connection-policy.xml').iter('testcase')); assert len(cases)>=58 and all(not list(c) for c in cases), 'Required connection policies cannot fail or skip'"
       - name: Native document bridge and restart recovery
         run: |
           cd "$CADWIZ_PACKAGE_ROOT"
@@ -91,13 +98,14 @@ jobs:
           git fetch --no-tags --depth=1 origin 613ea564cfff70b382a549de4ebc734571c356c5
           git archive --format=zip --output="$RUNNER_TEMP/cadwiz-legacy-091.zip" 613ea564cfff70b382a549de4ebc734571c356c5 CADWiz
           cd "$CADWIZ_PACKAGE_ROOT"
-          python scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output "$RUNNER_TEMP/mac-acceptance" --legacy-addon-archive "$RUNNER_TEMP/cadwiz-legacy-091.zip"
+          python scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output "$RUNNER_TEMP/mac-acceptance" --legacy-addon-archive "$RUNNER_TEMP/cadwiz-legacy-091.zip" --permission-audit-tool "$RUNNER_TEMP/mac-permission-audit"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: connector-${{ matrix.platform }}
           path: |
             ${{ runner.temp }}/native-launcher-mcp.xml
+            ${{ runner.temp }}/native-connection-policy.xml
             ${{ runner.temp }}/distribution/SHA256SUMS.txt
             ${{ runner.temp }}/mac-acceptance/
             ${{ env.CADWIZ_PACKAGE_ROOT }}/*report.json

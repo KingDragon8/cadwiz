@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import sys
 
-VERSION = '1.0.0'
+VERSION = '0.9.8'
 REGISTRY = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\CADWiz'
 
 

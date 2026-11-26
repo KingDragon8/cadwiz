@@ -4,7 +4,7 @@ Read CADWIZ-SUPPORT.md in this folder before troubleshooting this release.
 Run read-only Doctor checks first. Do not execute untrusted startup code to
 inspect it. Preserve all user data and use the existing FreeCAD window.
 Ask before repairs or sharing diagnostic information. Do not claim startup or
-AI access from installed files. This support package describes version 1.0.0.
+AI access from installed files. This support package describes version 0.9.8.
 
 Before model changes establish document_operation: inspect, modify, new or variant.
 For a variant, use the exact requested source path and a separately named target;

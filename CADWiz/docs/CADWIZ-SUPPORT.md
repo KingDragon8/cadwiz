@@ -1,4 +1,4 @@
-# CADWiz support — 1.0.0
+# CADWiz support — 0.9.8
 
 ## Get help from the home panel
 

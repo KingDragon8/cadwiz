@@ -16,7 +16,7 @@ import time
 import tomllib
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "0.9.8"
 
 
 def data_dir() -> Path:

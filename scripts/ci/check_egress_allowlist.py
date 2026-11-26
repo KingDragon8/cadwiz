@@ -131,7 +131,7 @@ class _Scanner(ast.NodeVisitor):
                 else ""
             )
             lowered = owner_name.casefold()
-            if func.attr in {"urlopen", "urlretrieve", "create_connection"}:
+            if func.attr in {"urlopen", "urlretrieve", "create_connection", "build_opener"}:
                 return f"{owner_name}.{func.attr}"
             if any(hint in lowered for hint in _HTTP_CLIENT_HINTS):
                 return f"{owner_name}.{func.attr}"
