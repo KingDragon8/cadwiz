@@ -11,8 +11,9 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 
 
 def worker(config):
-    # Bundled macOS Python does not add FreeCAD's extension directory itself.
-    if sys.platform == 'darwin':
+    # Bundled POSIX Python does not add FreeCAD's extension directory itself.
+    # Match the extracted native bundle, never a system or developer FreeCAD.
+    if sys.platform in {'darwin', 'linux'}:
         resources=Path(sys.executable).resolve().parent.parent
         modules=[p for p in resources.rglob('FreeCAD*.so')
                  if p.name=='FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
