@@ -9,7 +9,7 @@ given an id such as CWR-20261021-0007:
   * report.json -- the error code and message, the last 10 steps before it (the
     plug-in's own call log, `tool-calls.jsonl`, each step cut to 500 characters),
     and the versions of CADWiz, FreeCAD, the operating system and the AI app;
-  * screenshot.png -- FreeCAD's window at that moment.
+  * screenshot.png -- a policy-checked native viewport image, when safe.
 
 Nothing leaves the computer here. Reports are kept 30 days. Sending one is
 `feedback.py`'s job, and only after the user has seen exactly what goes and said
@@ -33,7 +33,7 @@ TRAIL_STEPS = 10
 STEP_CHARS = 500
 REPORT_ID = re.compile(r"^CWR-\d{8}-\d{4,}$")
 #: The items a report can carry, in the order the preview lists them. The
-#: model file is never included unless the user ticks it.
+#: model_file remains a legacy metadata key; support senders always exclude it.
 ITEMS = ("screenshot", "error", "trail", "versions", "model_file")
 DEFAULT_ITEMS = ("screenshot", "error", "trail", "versions")
 
