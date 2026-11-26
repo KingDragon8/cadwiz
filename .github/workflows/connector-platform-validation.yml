@@ -16,8 +16,6 @@ jobs:
           - {runner: macos-15-intel, platform: macos-x86_64}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
-    env:
-      QT_QPA_PLATFORM: offscreen
     defaults:
       run:
         shell: bash
@@ -80,7 +78,7 @@ jobs:
           "$CADWIZ_TEST_FREECAD_PYTHON" CADWiz/src/integrations/cadwiz_plugin/offline_launcher.py --check
           python -m pytest tests/test_dual_desktop_launcher.py --junitxml="$RUNNER_TEMP/native-launcher-mcp.xml"
           python -c "import xml.etree.ElementTree as E; r=E.parse('$RUNNER_TEMP/native-launcher-mcp.xml'); cases=list(r.iter('testcase')); assert len(cases)==3 and all(not list(c) for c in cases), 'Required launcher tests cannot fail or skip'"
-          python -m pytest tests/test_offline_runtime_identity.py
+          python -m pytest tests/test_offline_runtime_identity.py tests/test_cadwiz_connection_control.py
       - name: Native document bridge and restart recovery
         run: |
           cd "$CADWIZ_PACKAGE_ROOT"
