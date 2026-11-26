@@ -33,18 +33,18 @@ def worker(folder):
             self.send_header('Content-Length','2')
             self.end_headers()
             self.wfile.write(b'ok')
-    http = ThreadingHTTPServer(('127.0.0.1',0), Handler)
-    threading.Thread(target=http.serve_forever, daemon=True).start()
+    listener = ThreadingHTTPServer(('127.0.0.1',0), Handler)
+    threading.Thread(target=listener.serve_forever, daemon=True).start()
     try:
-        phase('02-stdlib-http-bind', server_name=http.server_name)
-        connection = http.client.HTTPConnection('127.0.0.1',http.server_port,timeout=5)
+        phase('02-stdlib-http-bind', server_name=listener.server_name)
+        connection = http.client.HTTPConnection('127.0.0.1',listener.server_port,timeout=5)
         connection.request('GET','/')
         assert connection.getresponse().read()==b'ok'
         connection.close()
         phase('03-stdlib-http-request')
     finally:
-        http.shutdown()
-        http.server_close()
+        listener.shutdown()
+        listener.server_close()
     from integrations.cadwiz_plugin import session, server, connection_control
     session.plugin_data_dir=lambda:folder/'plugin'
     connection_control.directory=lambda:folder/'connectors'
