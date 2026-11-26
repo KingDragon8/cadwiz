@@ -10,7 +10,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def worker(folder):
+def worker(folder,host_python=False):
     def phase(name, **details):
         record = folder/(name+'.json')
         record.write_text(json.dumps({'phase':name, **details}, default=str))
@@ -20,8 +20,11 @@ def worker(folder):
                 raise TimeoutError(name)
             time.sleep(.1)
     phase('00-python-start')
-    import FreeCAD
-    phase('01-freecad-import', version=FreeCAD.Version()[:3])
+    if host_python:
+        phase('01-host-python-no-freecad', executable=sys.executable)
+    else:
+        import FreeCAD
+        phase('01-freecad-import', version=FreeCAD.Version()[:3])
     from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
     import threading
     import http.client
@@ -75,19 +78,26 @@ def main():
     parser.add_argument('--python', type=Path)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--worker',action='store_true')
+    parser.add_argument('--host-python',action='store_true',help='Isolate the SDK test-client interpreter, without loading FreeCAD')
     args=parser.parse_args()
     assert sys.platform=='darwin' and os.environ.get('CI')=='true', 'Disposable Mac CI only'
     args.output.mkdir(parents=True,exist_ok=True)
     if args.worker:
-        worker(args.output)
+        worker(args.output,args.host_python)
         return
-    resources=args.python.resolve().parent.parent
-    modules=[p for p in resources.rglob('FreeCAD*.so') if p.name=='FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
-    assert len(modules)==1
-    env=dict(os.environ,PYTHONPATH=os.pathsep.join([str(modules[0].parent),str(ROOT/'CADWiz/src'),str(ROOT/'scripts/ci/network_audit')]),
+    extra=[]
+    if not args.host_python:
+        resources=args.python.resolve().parent.parent
+        modules=[p for p in resources.rglob('FreeCAD*.so') if p.name=='FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
+        assert len(modules)==1
+        extra.append(str(modules[0].parent))
+    env=dict(os.environ,PYTHONPATH=os.pathsep.join(extra+[str(ROOT/'CADWiz/src'),str(ROOT/'scripts/ci/network_audit')]),
              CADWIZ_NETWORK_AUDIT_DIR=str(args.output/'network-audit'),CADWIZ_SETUP_DIR=str(args.output/'helper'))
     with (args.output/'worker.log').open('w') as log:
-        process=subprocess.Popen([str(args.python),str(Path(__file__)), '--worker','--output',str(args.output)],env=env,stdout=log,stderr=log)
+        command=[sys.executable if args.host_python else str(args.python),str(Path(__file__)), '--worker','--output',str(args.output)]
+        if args.host_python:
+            command.append('--host-python')
+        process=subprocess.Popen(command,env=env,stdout=log,stderr=log)
         seen=set()
         deadline=time.monotonic()+240
         try:

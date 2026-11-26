@@ -14,29 +14,13 @@ jobs:
         with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - name: Verified official FreeCAD runtime
-        shell: bash
-        run: |
-          cd "$RUNNER_TEMP"
-          file=FreeCAD_1.1.4-macOS-arm64-py311.dmg
-          base=https://github.com/FreeCAD/FreeCAD/releases/download/1.1.4
-          curl --retry 3 --max-time 900 -fsSL "$base/$file" -o "$file"
-          curl --retry 3 -fsSL "$base/$file-SHA256.txt" -o sums.txt
-          test "$(shasum -a 256 "$file" | awk '{print $1}')" = "$(awk '{print $1; exit}' sums.txt)"
-          mkdir mount
-          hdiutil attach "$file" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/mount"
-          app=$(find "$RUNNER_TEMP/mount" -maxdepth 1 -name '*.app' -print -quit)
-          test -n "$app"
-          ditto "$app" "$RUNNER_TEMP/FreeCAD.app"
-          hdiutil detach "$RUNNER_TEMP/mount"
-      - name: Capture permission state after each native network phase
-        run: python scripts/ci/mac_network_probe.py --python "$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python" --output "$RUNNER_TEMP/mac-network-probe"
-      - name: Trace installed GUI and worker networking without granting permissions
-        run: python scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output "$RUNNER_TEMP/mac-acceptance" --network-audit
+      # Full FreeCAD-runtime and GUI baseline is retained in run45894559112.
+      # This follow-up isolates the host Python that runs the SDK tests.
+      - name: Capture permission state after each host Python network phase
+        run: python scripts/ci/mac_network_probe.py --host-python --output "$RUNNER_TEMP/mac-network-probe"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mac-first-run-network-evidence
           path: |
             ${{ runner.temp }}/mac-network-probe/
-            ${{ runner.temp }}/mac-acceptance/
