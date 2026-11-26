@@ -10,6 +10,7 @@ import platform
 import runpy
 import site
 import sys
+import sysconfig
 import tempfile
 import time
 import zipfile
@@ -45,10 +46,25 @@ def helper_lock(path):
                 fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
-def prepare(addon: Path) -> Path:
-    machine = platform.machine().lower()
+def runtime_tag() -> str:
+    if sys.platform == "win32":
+        # Windows platform.machine() depends on PROCESSOR_ARCHITECTURE, which
+        # supported MCP clients may omit. Match the interpreter build instead
+        # of its inherited shell environment (or a different host architecture).
+        compiled = sysconfig.get_platform().lower()
+        machine = {"win-amd64": "x86_64", "win-arm64": "arm64", "win32": "x86"}.get(compiled)
+        if machine is None:
+            raise RuntimeError("CW-SETUP-ARCH: Unsupported Windows Python build. Use supported 64-bit FreeCAD Python.")
+    else:
+        machine = platform.machine().lower()
     machine = {"amd64": "x86_64", "aarch64": "arm64"}.get(machine, machine)
-    key = f"{sys.platform}-{machine}-cp{sys.version_info.major}{sys.version_info.minor}"
+    if not machine:
+        raise RuntimeError("CW-SETUP-ARCH: Cannot identify this Python architecture. Use a supported FreeCAD installation.")
+    return f"{sys.platform}-{machine}-cp{sys.version_info.major}{sys.version_info.minor}"
+
+
+def prepare(addon: Path) -> Path:
+    key = runtime_tag()
     source = addon / "vendor/connector-wheels" / key
     if not (source / "manifest.json").is_file():
         raise RuntimeError(f"CW-SETUP-PYTHON: No offline helper for {key}. Use FreeCAD with Python 3.11 on a supported platform, or the advanced installer.")

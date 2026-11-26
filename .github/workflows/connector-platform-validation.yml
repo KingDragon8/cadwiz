@@ -1,0 +1,102 @@
+name: Native connector platform validation
+on:
+  push:
+    branches: ["codex/connector-platform-validation"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  connection:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, platform: linux-x86_64}
+          - {runner: macos-15, platform: macos-arm64}
+          - {runner: macos-15-intel, platform: macos-x86_64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      CADWIZ_SETUP_DIR: ${{ runner.temp }}/connector-private
+      QT_QPA_PLATFORM: offscreen
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build and extract the exact committed distribution
+        run: |
+          python scripts/release/build_artifact.py --output "$RUNNER_TEMP/distribution"
+          python - <<'PY'
+          import os, pathlib, zipfile
+          folder = pathlib.Path(os.environ['RUNNER_TEMP'])
+          archive, = (folder/'distribution').glob('cadwiz-*.zip')
+          with zipfile.ZipFile(archive) as package:
+              package.extractall(folder/'Extracted Customer Download')
+          root, = (folder/'Extracted Customer Download').iterdir()
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'CADWIZ_PACKAGE_ROOT={root}\n')
+          PY
+      - name: Download and verify official FreeCAD Python 3.11
+        run: |
+          base=https://github.com/FreeCAD/FreeCAD/releases/download/1.1.4
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            file=FreeCAD_1.1.4-Linux-x86_64-py311.AppImage
+          else
+            file=FreeCAD_1.1.4-macOS-$(uname -m)-py311.dmg
+          fi
+          curl --retry 3 -fsSL "$base/$file" -o "$RUNNER_TEMP/$file"
+          curl --retry 3 -fsSL "$base/$file-SHA256.txt" -o "$RUNNER_TEMP/checksums.txt"
+          cd "$RUNNER_TEMP"
+          expected=$(awk '{print $1; exit}' checksums.txt)
+          actual=$(shasum -a 256 "$file" | awk '{print $1}')
+          test "$expected" = "$actual"
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            chmod +x "$file"
+            "./$file" --appimage-extract > /dev/null
+            native="$RUNNER_TEMP/squashfs-root/usr/bin/python"
+          else
+            mkdir -p "$RUNNER_TEMP/freecad-dmg"
+            hdiutil attach "$file" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/freecad-dmg"
+            app=$(find "$RUNNER_TEMP/freecad-dmg" -maxdepth 1 -name '*.app' -print -quit)
+            test -n "$app"
+            ditto "$app" "$RUNNER_TEMP/FreeCAD.app"
+            hdiutil detach "$RUNNER_TEMP/freecad-dmg"
+            native="$RUNNER_TEMP/FreeCAD.app/Contents/Resources/bin/python"
+          fi
+          test -x "$native"
+          echo "CADWIZ_TEST_FREECAD_PYTHON=$native" >> "$GITHUB_ENV"
+      - name: Install test-client dependencies in the disposable runner
+        run: python -m pip install pytest "mcp==1.27.0"
+      - name: Native helper integrity, packaged launcher, discovery, read-only call and restart
+        run: |
+          cd "$CADWIZ_PACKAGE_ROOT"
+          "$CADWIZ_TEST_FREECAD_PYTHON" CADWiz/src/integrations/cadwiz_plugin/offline_launcher.py --check
+          python -m pytest tests/test_dual_desktop_launcher.py --junitxml="$RUNNER_TEMP/native-launcher-mcp.xml"
+          python -c "import xml.etree.ElementTree as E; r=E.parse('$RUNNER_TEMP/native-launcher-mcp.xml'); cases=list(r.iter('testcase')); assert len(cases)==3 and all(not list(c) for c in cases), 'Required launcher tests cannot fail or skip'"
+          python -m pytest tests/test_offline_runtime_identity.py
+      - name: Native document bridge and restart recovery
+        run: |
+          cd "$CADWIZ_PACKAGE_ROOT"
+          "$CADWIZ_TEST_FREECAD_PYTHON" scripts/ci/native_bridge_recovery_check.py
+      - name: Clean Mac install, upgrade and isolated GUI restart
+        if: runner.os == 'macOS'
+        run: |
+          cd "$CADWIZ_PACKAGE_ROOT"
+          python scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output "$RUNNER_TEMP/mac-acceptance"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: connector-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/native-launcher-mcp.xml
+            ${{ runner.temp }}/distribution/SHA256SUMS.txt
+            ${{ runner.temp }}/mac-acceptance/
+            ${{ env.CADWIZ_PACKAGE_ROOT }}/*report.json
+          if-no-files-found: error

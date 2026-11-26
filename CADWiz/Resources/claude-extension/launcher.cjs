@@ -11,7 +11,11 @@ try {
   const runtime = JSON.parse(fs.readFileSync(path.join(base, 'runtime.json'), 'utf8'));
   const launcher = path.join(runtime.addon, 'src', 'integrations', 'cadwiz_plugin', 'offline_launcher.py');
   if (!fs.existsSync(runtime.python) || !fs.existsSync(launcher)) throw Error('FreeCAD has moved.');
-  if (!/^0\.6\./.test(runtime.version)) throw Error('Update the CADWiz extension and FreeCAD add-on together.');
+  const extension = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.json'), 'utf8'));
+  const addon = JSON.parse(fs.readFileSync(path.join(runtime.addon, 'Resources', 'claude-extension', 'manifest.json'), 'utf8'));
+  if (runtime.version !== extension.version || addon.version !== extension.version) {
+    throw Error('Update the CADWiz extension and FreeCAD add-on together, then restart FreeCAD.');
+  }
   const child = spawn(runtime.python, [launcher], {
     stdio: 'inherit', shell: false, windowsHide: true,
     env: {...process.env, CADWIZ_CLIENT_APP: 'claude'},

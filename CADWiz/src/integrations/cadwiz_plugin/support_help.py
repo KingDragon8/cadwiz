@@ -33,14 +33,17 @@ def show_help(panel):
 
     import webbrowser
     section("Ask your assistant — fully integrated with CADWiz",
-            "Say: CADWiz, help me.\nExplain what you want to do or the problem you are having.",
+            "Already connected to CADWiz? Say: CADWiz, help me.\n"
+            "Explain what you want to do or the problem you are having.",
             "Copy: CADWiz, help me", lambda: assistant(HELP_PROMPT))
     section("Got a suggestion for CADWiz — tell your assistant",
             "Say: CADWiz, I've got an idea.\nLeave your message, then say: Send this to the CADWiz team. "
             "Your assistant prepares the report for you to confirm.",
             "Copy: CADWiz, I've got an idea", lambda: assistant(IDEA_PROMPT))
-    section("Or just email the CADWiz team",
-            "support@cadwiz.app\nAutomatic support tries to reply promptly. Reply to continue. "
+    section("Can't connect or install? Email the CADWiz team",
+            "support@cadwiz.app\nNo CADWiz connector is needed. Include the error message and "
+            "your operating system, FreeCAD version and assistant name if known. "
+            "Automatic support tries to reply promptly. Reply to continue. "
             "No FreeCAD model file is required.",
             "Email support@cadwiz.app", lambda: webbrowser.open("mailto:support@cadwiz.app?subject=CADWiz%20help"))
     note = widgets.QLabel("Report a problem in Help & Support to prepare a private screenshot preview. "
