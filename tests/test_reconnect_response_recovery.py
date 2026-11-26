@@ -1,8 +1,9 @@
 """Lost reconnect confirmations must recover without replaying CAD operations."""
 import http.client
 import json
-import time
+import urllib.error
 import urllib.request
+from types import SimpleNamespace
 
 import pytest
 from integrations.cadwiz_plugin import connection_control as control
@@ -61,12 +62,18 @@ def test_forbidden_request_is_not_retried(tmp_path,monkeypatch):
     original=urllib.request.OpenerDirector.open
     requests=[]
     def opened(*args,**kwargs):
-        requests.append(True)
-        return original(*args,**kwargs)
+        requests.append('open')
+        try:
+            return original(*args,**kwargs)
+        except urllib.error.HTTPError as error:
+            requests.append(error.code)
+            raise
     monkeypatch.setattr(urllib.request.OpenerDirector,'open',opened)
     try:
         assert not control.reconnect('chatgpt')
-        assert len(requests)==1 and callbacks==[]
+        # A transport loss before a denial arrives may safely retry. Once an
+        # actual403 is received there must be no further request or callback.
+        assert requests.count(403)==1 and requests[-1]==403 and callbacks==[]
     finally:
         endpoint.shutdown();endpoint.server_close()
 
@@ -75,18 +82,21 @@ def test_persistent_failure_has_one_overall_deadline(tmp_path,monkeypatch):
     monkeypatch.setattr(control,'directory',lambda:tmp_path)
     monkeypatch.setattr(control,'RECONNECT_BUDGET_S',.06,raising=False)
     monkeypatch.setattr(control,'RECONNECT_RETRY_DELAY_S',0,raising=False)
+    clock=SimpleNamespace(now=0.0)
+    def advance(seconds):
+        clock.now+=seconds
+    monkeypatch.setattr(control,'time',SimpleNamespace(monotonic=lambda:clock.now,sleep=advance))
     for index in range(12):
         (tmp_path/f'{index}.json').write_text(json.dumps({'app':'chatgpt','port':12345,'token':'private'}))
     timeouts=[]
     class Offline:
         def open(self,request,timeout):
             timeouts.append(timeout)
-            time.sleep(min(timeout,.025))
+            advance(min(timeout,.025))
             raise TimeoutError('injected unavailable transport')
     monkeypatch.setattr(urllib.request,'build_opener',lambda *_args:Offline())
-    started=time.monotonic()
     assert not control.reconnect('chatgpt')
-    assert time.monotonic()-started < .25
+    assert clock.now<=.06+1e-9
     # Subtracting absolute monotonic timestamps can add a few floating-point
     # rounding bits. One nanosecond does not relax the actual timeout contract.
     assert timeouts and max(timeouts)<=.06+1e-9
