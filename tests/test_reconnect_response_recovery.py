@@ -87,7 +87,9 @@ def test_persistent_failure_has_one_overall_deadline(tmp_path,monkeypatch):
     started=time.monotonic()
     assert not control.reconnect('chatgpt')
     assert time.monotonic()-started < .25
-    assert timeouts and max(timeouts)<=.06
+    # Subtracting absolute monotonic timestamps can add a few floating-point
+    # rounding bits. One nanosecond does not relax the actual timeout contract.
+    assert timeouts and max(timeouts)<=.06+1e-9
 
 
 @pytest.mark.parametrize('client,expected',[('claude','claude'),('chatgpt','chatgpt'),('codex_cli','codex_cli')])
