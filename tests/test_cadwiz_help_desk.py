@@ -66,7 +66,7 @@ def _report(tmp_path: Path, username: str = "maker") -> str:
     model.write_bytes(b"PK fake")
     return error_report.write_report(tmp_path, error_code="CW-PLUGIN-FAIL", message=f"at C:\\Users\\{username}\\x: boom",
                                      tool="build_model", log_path=log, grab_window=grab, model_file=str(model),
-                                     version_info={"cadwiz": "0.5.0-beta.2", "freecad": "1.1.3", "os": "Windows 10",
+                                     screenshot_policy="native-viewport-no-text-v1", version_info={"cadwiz": "0.5.0-beta.2", "freecad": "1.1.3", "os": "Windows 10",
                                                    "claude_desktop": "unknown"})
 
 
@@ -121,7 +121,7 @@ def test_the_session_attaches_a_report_when_a_tool_fails(tmp_path: Path) -> None
     result = session.call("inspect_document", {})
     assert result["ok"] is False and result["error_code"] == "CW-PLUGIN-FAIL"
     assert (tmp_path / "reports" / result["report_id"] / "report.json").is_file()
-    assert "send this to Steve" in result["note_for_claude"]
+    assert "send this to the CADWiz support team" in result["note_for_claude"]
 
 
 def test_first_call_is_only_a_preview_and_makes_no_network_request(tmp_path: Path) -> None:
@@ -153,12 +153,12 @@ def test_confirm_sends_once_signed_in_with_the_scrubbed_bundle(tmp_path: Path) -
     assert b".FCStd" not in body                                      # not ticked, not sent
 
 
-def test_the_model_file_goes_only_when_the_user_ticks_it(tmp_path: Path) -> None:
+def test_the_model_file_is_excluded_even_when_requested(tmp_path: Path) -> None:
     report_id = _report(tmp_path)
     desk = HelpDesk(tmp_path, http=NoNetwork())
     ticked = desk.send_feedback("bug", "Build failed on my bracket", "It stopped at step 3 every time.", report_id=report_id,
                                 include=["error", "model_file"])["preview"]
-    assert any(item.startswith("part.FCStd") for item in ticked["attached"]) and "screenshot" in ticked["left_out"]
+    assert not ticked["attached"] and "screenshot" in ticked["left_out"]
 
 
 def test_ideas_default_to_public_and_bad_input_is_refused_before_anything_else(tmp_path: Path) -> None:

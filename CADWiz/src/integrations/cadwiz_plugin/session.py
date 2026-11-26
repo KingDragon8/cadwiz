@@ -182,21 +182,19 @@ class PluginSession:
         document = getattr(self.app, "ActiveDocument", None)
         report_id = write_report(
             self.log_path.parent, error_code=error_code, message=str(result.get("detail_for_claude", "")), tool=tool,
-            log_path=self.log_path, grab_window=self._grab_window, model_file=str(getattr(document, "FileName", "") or ""),
+            log_path=self.log_path, grab_window=self._grab_window, model_file="", screenshot_policy="native-viewport-no-text-v1",
             version_info={"cadwiz": CADWIZ_VERSION, "freecad": freecad or "unknown",
                           "os": platform.platform(terse=True), "claude_desktop": "unknown"})
         if report_id:
             result["report_id"] = report_id
             result["error_code"] = error_code
             result["note_for_claude"] = (f"A local error report {report_id} ({error_code}) was saved on this computer. Offer once: "
-                                         "\"Want me to send this to Steve?\" -- only with a yes, use cadwiz_send_feedback.")
+                                         "\"Want me to send this to the CADWiz support team?\" -- only with a yes, use cadwiz_send_feedback.")
 
     def _grab_window(self, path: Path) -> bool:
-        """FreeCAD's whole window as a picture (a fraction of a second; window thread)."""
-        if self.gui is None:
-            return False
-        window = self.gui.getMainWindow()
-        return bool(window.grab().save(str(path), "PNG"))
+        """Capture a support-safe viewport in the existing application instance."""
+        from integrations.cadwiz_plugin.support_screenshot import capture
+        return capture(self.gui, self.app, path)
 
     # ---- documents ---------------------------------------------------------------------
     def _document(self, name: str | None = None) -> Any:

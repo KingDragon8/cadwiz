@@ -83,7 +83,7 @@ def prune(folder: Path, now: float | None = None) -> int:
 
 def write_report(data_dir: Path, *, error_code: str, message: str, tool: str, log_path: Path,
                  grab_window: Callable[[Path], bool] | None = None, model_file: str = "",
-                 version_info: dict[str, str] | None = None, when: float | None = None) -> str:
+                 version_info: dict[str, str] | None = None, when: float | None = None, screenshot_policy: str = "") -> str:
     """Write a report for a failure and return its id. Never raises: a report that
     cannot be written must not turn one failure into two."""
     try:
@@ -100,7 +100,7 @@ def write_report(data_dir: Path, *, error_code: str, message: str, tool: str, lo
         report = {"report_id": report_id, "error_code": error_code, "message": message[:2000], "tool": tool,
                   "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(when if when is not None else time.time())),
                   "trail": read_trail(log_path), "versions": version_info or versions(),
-                  "screenshot": shot, "model_file": model_file}
+                  "screenshot": shot, "screenshot_policy": screenshot_policy, "model_file": model_file}
         (target / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
         return report_id
     except Exception:  # noqa: BLE001

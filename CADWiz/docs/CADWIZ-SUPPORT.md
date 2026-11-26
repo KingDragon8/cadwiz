@@ -2,15 +2,27 @@
 
 ## Get help from the home panel
 
-Press **Get help — assistant or email** on the CADWiz home panel. Choose your
+Say **“CADWiz, help me.”** in your connected assistant, then explain your goal or problem.
+For a suggestion, say **“CADWiz, I've got an idea.”**, leave your message and add
+**“Send this to the CADWiz team.”** These are natural-language prompts, not a new
+wake-word listener. Your assistant prepares feedback for confirmation.
+
+Press the visible **Help** button on the CADWiz home panel. Choose your
 connected assistant, or email **support@cadwiz.app**. Automatic software support
 covers downloads, installation, connection problems, errors and feature questions.
 Describe what happened, your CADWiz and FreeCAD versions, and your operating system.
 Reply in the same email thread to continue the conversation. Replies may be automated;
 software fixes still require validation and owner approval before release.
 
-The support service does not build CAD models for you. Your model, credentials and
-diagnostic reports are never attached automatically. Review any report before sharing.
+The support service does not build CAD models for you. Support never uploads an
+editable FreeCAD file, even if an old client option requests it. Report a problem
+prepares a private preview with scrubbed text and, when safe, a native viewport
+image. Desktop pixels, titles, private panels and chats are excluded by construction.
+Text/image annotations, linked objects, custom renderers or mismatched documents
+use text alone; old unmasked screenshots are not sent. No manual cropping is required.
+The image can show your part geometry; review the preview before Send.
+Email attachments are not automatically analysed; the screenshot report uses the
+existing private feedback attachment route.
 For the current service status and contact options, visit https://cadwiz.app/support.
 
 ## Connection recovery and ordinary-language status

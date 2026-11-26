@@ -143,7 +143,7 @@ class HelpDesk:
             report = load_report(self.data_dir, report_id)
             if report is None:
                 raise TypeError(f"no error report {report_id!r} on this computer")
-            chosen = [i for i in (include if include is not None else DEFAULT_ITEMS) if i in ITEMS]
+            chosen = [i for i in (include if include is not None else DEFAULT_ITEMS) if i in ITEMS and i != "model_file"]
             bundle = bundle_for_sending(report, chosen)
             fields.update(report_id=report_id, error_code=str(report.get("error_code", "")),
                           bundle=json.dumps(bundle))
@@ -151,12 +151,9 @@ class HelpDesk:
             fields.update({k: str(v)[:60] for k, v in (("freecad_version", versions.get("freecad")), ("os", versions.get("os")),
                                                         ("claude_desktop_version", versions.get("claude_desktop"))) if v})
             shot = reports_dir(self.data_dir) / report_id / "screenshot.png"
-            if "screenshot" in chosen and shot.is_file():
+            if "screenshot" in chosen and shot.is_file() and report.get("screenshot_policy") == "native-viewport-no-text-v1":
                 files.append(("screenshot.png", shot))
-            model = Path(str(report.get("model_file") or ""))
-            if "model_file" in chosen and model.suffix.lower() == ".fcstd" and model.is_file():
-                if model.stat().st_size <= MAX_FILE_BYTES:
-                    files.append((model.name, model))
+            # Support never uploads editable CAD model files, even if requested.
             shown["report_id"] = report_id
             shown["bundle"] = bundle
             shown["attached"] = [f"{name} ({path.stat().st_size // 1024} KB)" for name, path in files]

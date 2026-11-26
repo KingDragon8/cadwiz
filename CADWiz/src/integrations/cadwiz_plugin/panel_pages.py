@@ -662,7 +662,18 @@ class SetupPage:
         save_row.addWidget(self.saved, 1)
         column.addLayout(save_row)
 
-        help_box, x_col = panel._section(inner, "Help")
+        help_box, x_col = panel._section(inner, "Help & Support")
+        contact = QtWidgets.QLabel("<b>Software support:</b> <a href='mailto:support@cadwiz.app'>support@cadwiz.app</a><br>"
+                                  "<a href='https://cadwiz.app/support'>cadwiz.app/support</a> — help and feedback options.<br>"
+                                  "Automatic support tries to reply promptly. Reply to continue; the owner receives a private copy.<br>"
+                                  "Do not send API keys or passwords. Reports and model files are not attached automatically.", help_box)
+        contact.setWordWrap(True)
+        contact.setOpenExternalLinks(True)
+        x_col.addWidget(contact)
+        from integrations.cadwiz_plugin.support_help import show_help
+        support_choices = QtWidgets.QPushButton("Help, suggestions & email", help_box)
+        support_choices.clicked.connect(lambda _checked=False: show_help(panel))
+        x_col.addWidget(support_choices)
         from integrations.cadwiz_plugin.slim_panel import EXAMPLE_SENTENCES
 
         x_col.addWidget(QtWidgets.QLabel("Try saying to your assistant:", help_box))
@@ -942,8 +953,8 @@ class SetupPage:
         folder.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d-%H%M%S")
         picture = folder / f"report-{stamp}.png"
-        with contextlib.suppress(Exception):
-            import_module("FreeCADGui").getMainWindow().grab().save(str(picture))
+        from integrations.cadwiz_plugin.support_screenshot import capture, POLICY
+        capture(import_module("FreeCADGui"), import_module("FreeCAD"), picture)
         lines = ["CADWiz problem report", f"What went wrong: {self.report_note.text().strip() or '(no note)'}",
                  _build_line() or "Build: not recorded", f"Connection: {connection(panel.bridge())['line']}"]
         with contextlib.suppress(Exception):
@@ -976,7 +987,7 @@ class SetupPage:
         self.last_report_id = write_report(
             plugin_data_dir(), error_code="CW-PANEL-REPORT", message=panel_report_message(note, problems),
             tool="report_a_problem", log_path=log, grab_window=copy_picture,
-            model_file=str(getattr(document, "FileName", "") or ""), version_info=self._versions())
+            model_file="", version_info=self._versions(), screenshot_policy=POLICY)
         if self.last_report_id:
             lines.insert(1, f"Report id: {self.last_report_id}")
         text = "\n".join(lines)
