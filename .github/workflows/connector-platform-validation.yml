@@ -17,7 +17,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     env:
-      CADWIZ_SETUP_DIR: ${{ runner.temp }}/connector-private
       QT_QPA_PLATFORM: offscreen
     defaults:
       run:
@@ -42,6 +41,7 @@ jobs:
           root, = (folder/'Extracted Customer Download').iterdir()
           with open(os.environ['GITHUB_ENV'], 'a') as output:
               output.write(f'CADWIZ_PACKAGE_ROOT={root}\n')
+              output.write(f'CADWIZ_SETUP_DIR={folder}/connector-private\n')
           PY
       - name: Download and verify official FreeCAD Python 3.11
         run: |
