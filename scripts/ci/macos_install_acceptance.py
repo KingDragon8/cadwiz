@@ -20,6 +20,8 @@ def main():
     parser.add_argument('--app', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--case-parent', type=Path)
+    parser.add_argument('--legacy-addon-archive', type=Path,
+                        help='Pinned prior-release CADWiz ZIP fixture when testing an extracted customer download without Git history')
     args = parser.parse_args()
     assert sys.platform == 'darwin' and os.environ.get('CI') == 'true', 'Isolated macOS CI only'
     repo = Path(__file__).resolve().parents[2]
@@ -141,7 +143,8 @@ QtCore.QTimer.singleShot(12000, finish)
         assert record['support_button_visible'] and record['working_file_button_visible'], record
         if label == 'clean-install':
             assert record.get('pulley_native_gui', {}).get('status') == 'PASS', record
-        assert record['cadwiz_version'] == '1.0.0', record
+        expected_version = json.loads((repo/'CADWiz/Resources/claude-extension/manifest.json').read_text())['version']
+        assert record['cadwiz_version'] == expected_version, record
         assert record['communication_title'] == 'Wiz communication screen' and record['guidance_present'], record
         assert record['aiwiz_tabs'] == ['AI Wiz Setup', 'AI Wiz Management'], record
         assert Path(record['loaded_source']).samefile(mod/'CADWiz'), record
@@ -166,8 +169,13 @@ QtCore.QTimer.singleShot(12000, finish)
     startup('restart-3')
     # Test an actual prior committed release, not just a directory labelled old.
     archive = qa/'old.zip'
-    run(['git', '-C', repo, 'archive', '--format=zip', '--output='+str(archive), 'v0.9.1', 'CADWiz'])
+    if args.legacy_addon_archive:
+        shutil.copyfile(args.legacy_addon_archive, archive)
+    else:
+        run(['git', '-C', repo, 'archive', '--format=zip', '--output='+str(archive), 'v0.9.1', 'CADWiz'])
     with zipfile.ZipFile(archive) as package:
+        assert all(not Path(name).is_absolute() and '..' not in Path(name).parts
+                   and Path(name).parts[0] == 'CADWiz' for name in package.namelist()), 'Unsafe prior-release fixture'
         package.extractall(qa/'old')
     # Keep current disposable install outside Mod too.
     (mod/'CADWiz').rename(qa/'clean-before-upgrade')

@@ -86,8 +86,12 @@ jobs:
       - name: Clean Mac install, upgrade and isolated GUI restart
         if: runner.os == 'macOS'
         run: |
+          # Only the old-version fixture comes from history. The current add-on
+          # and all acceptance code still run from the extracted customer ZIP.
+          git fetch --no-tags --depth=1 origin 613ea564cfff70b382a549de4ebc734571c356c5
+          git archive --format=zip --output="$RUNNER_TEMP/cadwiz-legacy-091.zip" 613ea564cfff70b382a549de4ebc734571c356c5 CADWiz
           cd "$CADWIZ_PACKAGE_ROOT"
-          python scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output "$RUNNER_TEMP/mac-acceptance"
+          python scripts/ci/macos_install_acceptance.py --app "$RUNNER_TEMP/FreeCAD.app" --output "$RUNNER_TEMP/mac-acceptance" --legacy-addon-archive "$RUNNER_TEMP/cadwiz-legacy-091.zip"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
