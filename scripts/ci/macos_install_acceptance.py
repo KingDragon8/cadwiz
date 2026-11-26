@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--case-parent', type=Path)
     parser.add_argument('--legacy-addon-archive', type=Path,
                         help='Pinned prior-release CADWiz ZIP fixture when testing an extracted customer download without Git history')
+    parser.add_argument('--network-audit', action='store_true', help='Record socket addresses/stacks in disposable CI only')
     args = parser.parse_args()
     assert sys.platform == 'darwin' and os.environ.get('CI') == 'true', 'Isolated macOS CI only'
     repo = Path(__file__).resolve().parents[2]
@@ -40,6 +41,9 @@ def main():
                if p.name == 'FreeCAD.so' or p.name.startswith('FreeCAD.cpython-')]
     assert len(modules) == 1, f'Expected one FreeCAD module in bundle: {modules}'
     env['PYTHONPATH'] = str(modules[0].parent)
+    if args.network_audit:
+        env['PYTHONPATH'] += os.pathsep+str(repo/'scripts/ci/network_audit')
+        env['CADWIZ_NETWORK_AUDIT_DIR'] = str(out/'network-audit')
     gui = args.app/'Contents/MacOS/FreeCAD'
     def run(command):
         try:
